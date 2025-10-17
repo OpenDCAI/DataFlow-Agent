@@ -286,42 +286,51 @@ def build_stub(cls_name: str, module_path: str) -> str:
     )
 
 
-def group_imports(op_names: List[str]) -> Tuple[List[str], List[str], Dict[str, type]]:
+def _normalize_module(mod: str) -> str:
     """
-    Returns:
-        imports: list of import lines
-        stubs: list of stub class code blocks
-        op_classes: mapping from provided operator name -> actual class object
-    """
-    imports: List[str] = []
-    stubs: List[str] = []
-    op_classes: Dict[str, type] = {}
+    将类似
+        dataflow.operators.general_text.eval.langkit_sample_evaluator
+    统一裁剪成
+        dataflow.operators.general_text
 
+    规则：
+        1. 仅处理以 "dataflow.operators." 开头的模块。
+        2. 只保留 "dataflow.operators.<一级子包>"。
+        3. 其余模块原样返回。
+    """
+    prefix = "dataflow.operators."
+    if mod.startswith(prefix):
+        # 拿掉前缀后按点分割，取第 0 个就是一级子包
+        subpkg = mod[len(prefix):].split(".", 1)[0]
+        return f"{prefix}{subpkg}"
+    return mod
+
+def group_imports(op_names: List[str]) -> Tuple[List[str], List[str], Dict[str, type]]:
+    imports, stubs = [], []
+    op_classes: Dict[str, type] = {}
     module2names: Dict[str, List[str]] = defaultdict(list)
 
     for name in op_names:
         cls = OPERATOR_REGISTRY.get(name)
         if cls is None:
             raise KeyError(f"Operator <{name}> not in OPERATOR_REGISTRY")
-
         op_classes[name] = cls
-        mod = cls.__module__
+
+        mod_raw = cls.__module__                       # e.g. dataflow.operators.general_text.eval.langkit_sample_evaluator
+        mod = _normalize_module(mod_raw)               # → dataflow.operators.general_text
+
         if try_import(mod):
             module2names[mod].append(cls.__name__)
-        else:
+        else:                                          # 正常情况下进不到这里
             stubs.append(build_stub(cls.__name__, mod))
 
+    # 只保留一次循环
     for m in sorted(module2names.keys()):
-        names = sorted(set(module2names[m]))
-        imports.append(f"from {m} import {', '.join(names)}")
+        uniq_names = sorted(set(module2names[m]))
+        imports.append(f"from {m} import {', '.join(uniq_names)}")
 
-    for m in sorted(module2names.keys()):
-        names = sorted(set(module2names[m]))
-        imports.append(f"from {m} import {', '.join(names)}")
-
-    # 追加 choose_prompt_template 过程中收集的额外 import
+    # 追加由 choose_prompt_template 收集的 import
     imports.extend(sorted(EXTRA_IMPORTS))
-
     return imports, stubs, op_classes
 
 
