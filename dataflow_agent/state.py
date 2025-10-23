@@ -7,6 +7,11 @@ BASE_DIR = DataFlowPath.get_dataflow_dir()
 DATAFLOW_DIR = BASE_DIR.parent
 STATICS_DIR = DataFlowPath.get_dataflow_statics_dir()
 
+
+current_file = Path(__file__).resolve()
+PROJDIR = current_file.parent.parent
+
+
 from typing_extensions import TypedDict, Annotated
 from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
@@ -42,6 +47,10 @@ class DFRequest:
     # ⑧ 是否使用本地模型而非远程 OpenAI
     use_local_model: bool = False
     local_model_path: str = ""                   # 指向 .gguf / .bin / huggingface checkpoint
+    
+    # cache_dir 
+    cache_dir: str = f"{PROJDIR}/cache_dir"
+    
 
 
 @dataclass
