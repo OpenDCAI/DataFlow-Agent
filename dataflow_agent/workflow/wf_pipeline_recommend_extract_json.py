@@ -201,7 +201,7 @@ def create_pipeline_graph() -> GenericGraphBuilder:
             s,
             skip_assemble=skip,
             file_path= s.request.python_file_path,
-            assembler_kwargs={"file_path": s.request.json_file, "chat_api_url": s.request.chat_api_url},
+            assembler_kwargs={"file_path": s.request.json_file, "chat_api_url": s.request.chat_api_url, "cache_dir": s.request.cache_dir},
         )
 
     async def debugger_node(s: DFState) -> DFState:

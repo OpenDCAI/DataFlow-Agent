@@ -306,13 +306,22 @@ class DataPipelineBuilder(BaseAgent):
                 if not file_path_obj.is_file():
                     raise FileNotFoundError(f"待执行文件不存在: {file_path_obj}")
 
-            # ---------------- ③ 真执行 -----------------------
-            exec_result = await _run_py(Path(file_path))
-            state.execution_result = exec_result
-            log.info(f"[pipeline_builder] run success={exec_result['success']}")
+            # -------------- ③ 真执行 -----------------------
+            if state.request.need_debug:
+                log.info("[pipeline_builder] 开始 Debug 执行")
+                exec_result = await _run_py(Path(file_path))
+                state.execution_result = exec_result
+                log.info(f"[pipeline_builder] run success={exec_result['success']}")
+            else:
+                log.info("[pipeline_builder] 跳过执行，仅生成代码文件")
+                state.execution_result = {
+                    "success": None,
+                    "skipped": True,
+                    "file_path": file_path,
+                }
 
             # 若调试成功，关闭 debug 开关，以便后续跑全量数据
-            if getattr(state, "debug_mode", False) and exec_result["success"]:
+            if getattr(state, "debug_mode", False) and state.execution_result.get("success"):
                 state.debug_mode = False
                 log.info("[pipeline_builder] debug run passed, state.debug_mode -> False")
 
