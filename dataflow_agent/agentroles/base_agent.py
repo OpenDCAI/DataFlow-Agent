@@ -12,9 +12,9 @@ from dataflow_agent.promptstemplates.prompt_template import PromptsTemplateGener
 from dataflow_agent.state import DFState
 from dataflow_agent.utils import robust_parse_json
 from dataflow_agent.toolkits.tool_manager import ToolManager
-from dataflow import get_logger
+from dataflow_agent.logger import get_logger
 
-log = get_logger()
+log = get_logger(__name__)
 
 # 验证器类型定义：返回 (是否通过, 错误信息)
 ValidatorFunc = Callable[[str, Dict[str, Any]], Tuple[bool, Optional[str]]]
