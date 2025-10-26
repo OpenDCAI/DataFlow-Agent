@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 from typing import Any, Dict, List, Optional, Callable, Set
 from langchain_core.tools import Tool
-from dataflow import get_logger
+from dataflow_agent.logger import get_logger
 
-log = get_logger()
+log = get_logger(__name__)
 
 class ToolManager:
     """工具管理器 - 支持不同角色的工具管理"""
