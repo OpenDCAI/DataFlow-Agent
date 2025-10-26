@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Type, Callable, Tuple
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage, AIMessage
 from langchain_core.tools import Tool
+from pydantic import BaseModel, Field
 
 from dataflow_agent.promptstemplates.prompt_template import PromptsTemplateGenerator
 from dataflow_agent.state import DFState
@@ -17,6 +18,7 @@ log = get_logger()
 
 # 验证器类型定义：返回 (是否通过, 错误信息)
 ValidatorFunc = Callable[[str, Dict[str, Any]], Tuple[bool, Optional[str]]]
+
 
 class BaseAgent(ABC):
     """Agent基类 - 定义通用的agent执行模式"""
@@ -114,6 +116,93 @@ class BaseAgent(ABC):
     def get_default_pre_tool_results(self) -> Dict[str, Any]:
         """获取默认前置工具结果 - 子类可重写"""
         return {}
+    
+    # ==================== Agent-as-Tool 功能 ====================
+
+    def get_tool_name(self) -> str:
+        """获取作为工具时的名称 - 子类可重写"""
+        return f"call_{self.role_name.lower()}_agent"
+
+    def get_tool_description(self) -> str:
+        """获取作为工具时的描述 - 子类应该重写提供更具体的描述"""
+        return f"调用 {self.role_name} agent 来执行特定任务。该 agent 会根据输入参数执行相应的分析和处理。"
+
+    def get_tool_args_schema(self) -> Type[BaseModel]:
+        """获取作为工具时的参数模式 - 子类可以重写定义自己的参数结构"""
+        from pydantic import BaseModel, Field
+        
+        class DefaultAgentToolArgs(BaseModel):
+            """默认 Agent 工具参数"""
+            task_description: str = Field(
+                description=f"传递给 {self.role_name} 的任务描述或指令"
+            )
+            additional_params: Optional[Dict[str, Any]] = Field(
+                default=None,
+                description="额外的参数，会被合并到前置工具结果中"
+            )
+        
+        return DefaultAgentToolArgs
+
+    def prepare_tool_execution_params(self, **tool_kwargs) -> Dict[str, Any]:
+        """准备工具执行时的参数 - 子类可重写自定义参数处理逻辑"""
+        params = {}
+        
+        if 'additional_params' in tool_kwargs and tool_kwargs['additional_params']:
+            params.update(tool_kwargs['additional_params'])
+        
+        for key, value in tool_kwargs.items():
+            if key != 'additional_params':
+                params[key] = value
+        
+        return params
+
+    def extract_tool_result(self, state: DFState) -> Dict[str, Any]:
+        """从状态中提取工具调用的结果 - 子类可重写自定义结果提取逻辑"""
+        agent_result = state.agent_results.get(self.role_name, {})
+        return agent_result.get('results', {})
+
+    async def _execute_as_tool(self, state: DFState, **tool_kwargs) -> Dict[str, Any]:
+        """作为工具执行的内部方法"""
+        try:
+            log.info(f"[Agent-as-Tool] 调用 {self.role_name}，参数: {tool_kwargs}")
+            
+            exec_params = self.prepare_tool_execution_params(**tool_kwargs)
+            
+            result_state = await self.execute(
+                state, 
+                use_agent=False,
+                **exec_params
+            )
+            
+            result = self.extract_tool_result(result_state)
+            
+            log.info(f"[Agent-as-Tool] {self.role_name} 执行完成")
+            return result
+            
+        except Exception as e:
+            log.exception(f"[Agent-as-Tool] {self.role_name} 执行失败: {e}")
+            return {
+                "error": str(e),
+                "agent": self.role_name,
+                "status": "failed"
+            }
+
+    def as_tool(self, state: DFState) -> Tool:
+        """将 agent 包装成可被调用的工具"""
+        
+        async def agent_tool_func(**kwargs) -> Dict[str, Any]:
+            return await self._execute_as_tool(state, **kwargs)
+        
+        def sync_agent_tool_func(**kwargs) -> Dict[str, Any]:
+            return asyncio.run(agent_tool_func(**kwargs))
+        
+        return Tool(
+            name=self.get_tool_name(),
+            description=self.get_tool_description(),
+            func=sync_agent_tool_func,
+            coroutine=agent_tool_func,
+            args_schema=self.get_tool_args_schema()
+        )
     
     # ==================== ReAct 模式相关方法 ====================
     
