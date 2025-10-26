@@ -8,6 +8,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, BaseMessage, AI
 from langchain_core.tools import Tool
 from pydantic import BaseModel, Field
 
+from dataflow_agent.agentroles.registry import AgentRegistry
 from dataflow_agent.promptstemplates.prompt_template import PromptsTemplateGenerator
 from dataflow_agent.state import DFState
 from dataflow_agent.utils import robust_parse_json
@@ -22,6 +23,15 @@ ValidatorFunc = Callable[[str, Dict[str, Any]], Tuple[bool, Optional[str]]]
 
 class BaseAgent(ABC):
     """Agent基类 - 定义通用的agent执行模式"""
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        try:
+            tmp = cls(tool_manager=None)          # BaseAgent 的 __init__ 很轻
+            name = tmp.role_name
+            AgentRegistry.register(name.lower(), cls)
+        except Exception as e:
+            pass
     
     def __init__(self, 
                  tool_manager: Optional[ToolManager] = None,
