@@ -1,0 +1,6 @@
+# 默认基础依赖
+-r requirements-base.txt
+
+# 可选依赖：
+#   pip install -r requirements-dev.txt
+#   pip install -r requirements-data.txt
