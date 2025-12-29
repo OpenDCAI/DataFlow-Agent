@@ -66,7 +66,6 @@ class MainState:
 - **MainState**: 基础状态类，包含核心字段
 - **DFState**: 主流程状态，扩展调试和管道相关字段
 - **DataCollectionState**: 数据采集专用状态
-- **IconGenState**: 图标生成专用状态
 - **WebCrawlState**: 网络爬取专用状态
 - **PromptWritingState**: 提示词生成专用状态
 

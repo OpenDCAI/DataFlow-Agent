@@ -21,7 +21,6 @@ TAB_NAME_MAP = {
 PAGE_SETS: dict[str, Optional[Set[str]]] = {
     "all": None,  # 全量加载 pages 目录下的所有页面
     "data": {"operator_write", "PA_frontend","op_assemble_line","pipeline_rec","web_collection", "operator_qa"},
-    "paper": {"icongen_refine"}
 }
 
 

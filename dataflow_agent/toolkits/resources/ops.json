@@ -4755,7 +4755,7 @@
           },
           {
             "name": "prompt_template",
-            "default": "<dataflow.prompts.kbcleaning.MathbookQuestionExtractPrompt object at 0x7f1683a54410>",
+            "default": "<dataflow.prompts.kbcleaning.MathbookQuestionExtractPrompt object at 0x7fe4fae06890>",
             "kind": "POSITIONAL_OR_KEYWORD"
           },
           {
@@ -7837,6 +7837,42 @@
           {
             "name": "input_output_key",
             "default": "output",
+            "kind": "POSITIONAL_OR_KEYWORD"
+          }
+        ]
+      },
+      "required": "",
+      "depends_on": [],
+      "mode": ""
+    }
+  ],
+  "unknown": [
+    {
+      "node": 188,
+      "name": "SentimentAnalysisOperator",
+      "description": "使用LLM进行文本情感分析，返回情感倾向得分，得分范围为-1到1，负值表示负面情感，正值表示正面情感。输入参数：\n- llm_serving：LLM服务对象\n- input_key：输入文本字段名\n- output_key：输出得分字段名，默认'SentimentScore'\n输出参数：\n- 包含情感分析得分的DataFrame",
+      "parameter": {
+        "init": [
+          {
+            "name": "llm_serving",
+            "default": null,
+            "kind": "POSITIONAL_OR_KEYWORD"
+          }
+        ],
+        "run": [
+          {
+            "name": "storage",
+            "default": null,
+            "kind": "POSITIONAL_OR_KEYWORD"
+          },
+          {
+            "name": "input_key",
+            "default": null,
+            "kind": "POSITIONAL_OR_KEYWORD"
+          },
+          {
+            "name": "output_key",
+            "default": "SentimentScore",
             "kind": "POSITIONAL_OR_KEYWORD"
           }
         ]
@@ -12584,7 +12620,7 @@
           },
           {
             "name": "prompt_template",
-            "default": "<dataflow.prompts.kbcleaning.MathbookQuestionExtractPrompt object at 0x7f1683a54410>",
+            "default": "<dataflow.prompts.kbcleaning.MathbookQuestionExtractPrompt object at 0x7fe4fae06890>",
             "kind": "POSITIONAL_OR_KEYWORD"
           },
           {
@@ -15656,6 +15692,40 @@
           {
             "name": "input_output_key",
             "default": "output",
+            "kind": "POSITIONAL_OR_KEYWORD"
+          }
+        ]
+      },
+      "required": "",
+      "depends_on": [],
+      "mode": ""
+    },
+    {
+      "node": 188,
+      "name": "SentimentAnalysisOperator",
+      "description": "使用LLM进行文本情感分析，返回情感倾向得分，得分范围为-1到1，负值表示负面情感，正值表示正面情感。输入参数：\n- llm_serving：LLM服务对象\n- input_key：输入文本字段名\n- output_key：输出得分字段名，默认'SentimentScore'\n输出参数：\n- 包含情感分析得分的DataFrame",
+      "parameter": {
+        "init": [
+          {
+            "name": "llm_serving",
+            "default": null,
+            "kind": "POSITIONAL_OR_KEYWORD"
+          }
+        ],
+        "run": [
+          {
+            "name": "storage",
+            "default": null,
+            "kind": "POSITIONAL_OR_KEYWORD"
+          },
+          {
+            "name": "input_key",
+            "default": null,
+            "kind": "POSITIONAL_OR_KEYWORD"
+          },
+          {
+            "name": "output_key",
+            "default": "SentimentScore",
             "kind": "POSITIONAL_OR_KEYWORD"
           }
         ]

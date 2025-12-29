@@ -52,7 +52,6 @@ simhash
 chonkie
 trafilatura
 lxml_html_clean
-pymupdf
 httpx[socks]
 
 # dataflow agent
@@ -87,11 +86,6 @@ kagglehub
 IPython==8.18.1
 pyarrow==20.0.0
 chromadb
-opencv-python
-
-# speech
-librosa
-soundfile
 
 
 # map visualize
