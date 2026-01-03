@@ -264,3 +264,5 @@ frontend-workflow/vite.config.ts
 
 logs/
 conf/
+
+tests/kps_test/
