@@ -164,6 +164,8 @@ def local_tool_for_get_categories():
         if hasattr(OPERATOR_REGISTRY, '_init_loaders'):
             OPERATOR_REGISTRY._init_loaders()
         if hasattr(OPERATOR_REGISTRY, '_get_all'):
+            print('[local_tool_for_get_categories]: if hasattr(OPERATOR_REGISTRY, _get_all):')
+            print("[local_tool_for_get_categories] OPERATOR_REGISTRY.get_obj_map(): ", OPERATOR_REGISTRY.get_obj_map())
             OPERATOR_REGISTRY._get_all()
         categories = set()
         for name, cls in OPERATOR_REGISTRY:
