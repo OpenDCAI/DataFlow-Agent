@@ -70,10 +70,10 @@ async def main() -> None:
         api_key=os.getenv("DF_API_KEY", "sk-dummy"),
         model="gpt-4o",
         json_file=f"{PROJECT_ROOT}/tests/test.jsonl",
-        target= "在知识库构建中，需要从语料 PDF 中提取可检索的干净文本。输入源唯一为 PDF（由 MinerUParser 解析）。管线对文本进行清洗与优化（去页眉页脚/水印等）、智能分段、敏感信息脱敏，并通过语义去重剔除重复或无效段落。最终输出唯一为可入库的结构化文本语料（脱敏后的分段文本集合，已完成语义去重），用于向量化检索与知识库入库。",
+        target= "给我简单的过滤或者去重算子就好了,只需要2个算子",
         python_file_path=str(python_file_path),  # pipeline 的输出脚本路径
-        need_debug= False,  # 是否需要 Debug
-        max_debug_rounds= 3,
+        need_debug= True,  # 是否需要 Debug
+        max_debug_rounds= 5,
         session_id=session_id,
         cache_dir="dataflow_cache"
     )

@@ -106,9 +106,9 @@ def _remove_leading_json_word(src: str) -> str:
 
 
 def _strip_json_comments(src: str) -> str:
-    src = re.sub(r"/\\*[\\s\\S]*?\\*/", "", src)
-    src = re.sub(r"(?<![:\\\"\\'])//.*", "", src)
-    src = re.sub(r",\\s*([}\\]])", r"\\1", src)
+    src = re.sub(r"/\*[\s\S]*?\*/", "", src)
+    # src = re.sub(r"(?<![:\"'])//.*", "", src)
+    src = re.sub(r",\s*([}\]])", r"\1", src)
     return src.strip()
 
 
@@ -158,4 +158,3 @@ def _maybe_merge(objs: List[Any], merge_dicts: bool) -> Union[Any, List[Any]]:
             merged.update(o)
         return merged
     return objs
-

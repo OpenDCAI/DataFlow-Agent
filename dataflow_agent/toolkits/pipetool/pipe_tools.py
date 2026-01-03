@@ -817,7 +817,13 @@ def render_operator_blocks_with_full_params(
         if name == "PromptedGenerator":
             prompted_gen_counter += 1
         
-        init_args.insert(0, 'llm_serving=self.llm_serving')
+        # 只在算子的 __init__ 签名中包含 llm_serving 且未在 custom_init_params 中提供时才添加
+        try:
+            init_sig = inspect.signature(cls.__init__)
+            if 'llm_serving' in init_sig.parameters and 'llm_serving' not in custom_init_params:
+                init_args.insert(0, 'llm_serving=self.llm_serving')
+        except Exception as e:
+            log.warning(f"[render_operator_blocks_with_full_params] Failed to inspect {cls.__name__}: {e}")
         init_line = f"self.{var_name} = {cls.__name__}({', '.join(init_args)})"
         init_lines.append(init_line)
 
@@ -861,7 +867,7 @@ def build_pipeline_code_with_full_params(
     prompted_generator_prompts: Optional[Dict[int, str]] = None,
 ) -> str:
     """构建完整的 pipeline 代码（支持 init + run 参数）"""
-    
+    log.critical(f'[build_pipeline_code_with_full_params]: {chat_api_url}')
     # 清空之前的额外导入
     EXTRA_IMPORTS.clear()
     
@@ -906,7 +912,7 @@ self.llm_serving = APILLMServing_request(
     model_name="{model_name}",
     max_workers=100,
 )'''
-
+    log.critical(f'[build_pipeline_code_with_full_params]: {chat_api_url}')
     # 6) 模板
     template = '''"""
 Auto-generated Pipeline (supports init + run params)

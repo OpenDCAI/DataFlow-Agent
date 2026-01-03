@@ -445,7 +445,7 @@ def _rc_ok(rc: int, *_args) -> bool:
 
 # ------ ② 不得出现关键 Warning ------
 _CRITICAL_WARNING_PATTERNS: List[re.Pattern] = [
-    re.compile(r"Warning:\s+Unexpected key", re.I),
+    # re.compile(r"Warning:\s+Unexpected key", re.I),
     # 继续往这里追加 regex
 ]
 

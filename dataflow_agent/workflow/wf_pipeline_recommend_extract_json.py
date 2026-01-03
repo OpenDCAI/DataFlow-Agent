@@ -342,8 +342,8 @@ def create_pipeline_graph() -> GenericGraphBuilder:
             "code_debug_result": dict(s.code_debug_result),
         }
 
-        # s.temp_data["round"] = round_id + 1
-        # s.debug_round = round_id + 1         
+        s.temp_data["round"] = round_id + 1
+        s.debug_round = round_id + 1         
         return s
 
     async def rewriter_node(s: DFState) -> DFState:
