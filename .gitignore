@@ -284,3 +284,6 @@ dev-debug.log
 .taskmaster/
 
 frontend-workflow/vite.config.ts
+
+# 允许提交 faiss_cache 目录 (原被 *_cache/ 忽略)
+!dataflow_agent/resources/faiss_cache/
