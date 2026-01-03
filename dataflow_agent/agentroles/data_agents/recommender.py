@@ -41,7 +41,8 @@ class DataPipelineRecommender(BaseAgent):
         """
         return {
             "sample": pre_tool_results.get("sample", ""),
-            "target": pre_tool_results.get("target", ""),
+            # "target": pre_tool_results.get("target", ""),
+            "target": self.state.temp_data.get('operator_descriptions', []),
             "operator": pre_tool_results.get("operator", "[]"),
             "op_nums": len(self.state.temp_data['split_ops'])/2,
         }

@@ -233,7 +233,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-dataflow-agent.log*
+dataflow_agent.log*
 
 # Editor directories and files
 .DS_Store
@@ -264,3 +264,5 @@ frontend-workflow/vite.config.ts
 
 logs/
 conf/
+Dataflow-KPS-main/
+tests/kps_test/

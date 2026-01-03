@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio, os, json, pathlib, dataclasses
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
+import dataflow_kps as kps
 
 from dataflow_agent.state import DFRequest, DFState
 from dataflow_agent.toolkits.basetool.file_tools import (
@@ -27,8 +28,6 @@ from dataflow_agent.agentroles.data_agents.debugger import create_code_debugger
 from dataflow_agent.agentroles.data_agents.rewriter import create_rewriter
 from dataflow_agent.agentroles.data_agents.inforequester import create_info_requester
 from dataflow_agent.agentroles.data_agents.exporter import create_exporter
-
-
 
 from dataflow_agent.toolkits.tool_manager import get_tool_manager
 from langchain.tools import tool
@@ -90,14 +89,15 @@ def create_pipeline_graph() -> GenericGraphBuilder:
         # 兜底：如果没有 RAG 结果，使用默认全量算子
         return get_operator_content_str(data_type="Default")
 
-    class GetOpInput(BaseModel):
-        oplist: list = Field(description="list['xxx']的算子列表")
+    # class GetOpInput(BaseModel):
+    #     oplist: list = Field(description="list['xxx']的算子列表")
 
-    @builder.post_tool("recommender")
-    @tool(args_schema=GetOpInput)
-    def combine_pipeline(oplist: list) -> str:
-        """Combine pipeline post tool for recommender"""
-        return post_process_combine_pipeline_result(oplist)
+    # @builder.post_tool("recommender")
+    # @tool(args_schema=GetOpInput)
+    # def combine_pipeline(oplist: list) -> str:
+    #     """Combine pipeline post tool for recommender"""
+    #     return post_process_combine_pipeline_result(oplist)
+        # return "运行成功，跳过！"
 
     # -------- debugger / rewriter 前置工具 --------
     @builder.pre_tool("pipeline_code", "code_debugger")
@@ -179,7 +179,7 @@ def create_pipeline_graph() -> GenericGraphBuilder:
         if operator_descriptions:
             s.temp_data['split_ops'] = get_operators_by_rag(
                 search_queries=operator_descriptions,
-                top_k=2,
+                top_k=3,
                 faiss_index_path=f"{PROJDIR}/dataflow_agent/resources/faiss_cache/all_ops.index",
                 base_url=f"{s.request.chat_api_url}embeddings" if s.request.chat_api_url_for_embeddings == "" else s.request.chat_api_url_for_embeddings,
                 model_name=s.request.embedding_model_name
@@ -189,7 +189,6 @@ def create_pipeline_graph() -> GenericGraphBuilder:
             log.info(f"[target_parser_node] RAG 检索结果: {s.temp_data['split_ops']}")
         else:
             s.temp_data['split_ops'] = []
-        
         return s
 
     # --- recommender 子图同原来 ---
@@ -237,27 +236,58 @@ def create_pipeline_graph() -> GenericGraphBuilder:
         from dataflow.utils.registry import OPERATOR_REGISTRY  
         _NAME2CLS = {name: cls for name, cls in OPERATOR_REGISTRY}
 
-        rec_graph = await build_recommender_subgraph(s)
-        result = await rec_graph.ainvoke(s)
-        if isinstance(result, dict):
-            for k, v in result.items():         
-                setattr(s, k, v)
-        else:
-            for f in dataclasses.fields(DFState):
-                setattr(s, f.name, getattr(result, f.name))
+        tm = get_tool_manager()
+        recommender = create_recommender(tool_manager=tm)
+        s = await recommender.execute(s, use_agent=False)
+        # rec_graph = await build_recommender_subgraph(s)
+        # result = await rec_graph.ainvoke(s)
+        # if isinstance(result, dict):
+        #     for k, v in result.items():         
+        #         setattr(s, k, v)
+        # else:
+        #     for f in dataclasses.fields(DFState):
+        #         setattr(s, f.name, getattr(result, f.name))
+
         rec_val = s.get("recommendation", {})
+
         ops_list = rec_val.get("ops", []) if isinstance(rec_val, dict) else rec_val
+        
         if not ops_list:
             raise ValueError("Recommender 没有返回有效算子列表")
         from dataflow_agent.toolkits.optool.op_tools import get_operators_by_rag
         
+        # 定义一个内部函数来处理 RAG 检索，包含对 PromptedGenerator 的过滤
+        def _safe_rag_retrieve(current_ops_list, index_path):
+            # 过滤 PromptedGenerator，防止被错误检索为 RetrievalGenerator
+            queries = [op for op in current_ops_list if op != "PromptedGenerator"]
+            
+            rag_results = []
+            if queries:
+                rag_results = get_operators_by_rag(
+                    search_queries=queries, 
+                    top_k=1, 
+                    faiss_index_path=index_path,
+                    base_url=f"{s.request.chat_api_url}embeddings" if s.request.chat_api_url_for_embeddings == "" else s.request.chat_api_url_for_embeddings,
+                    model_name = s.request.embedding_model_name
+                )
+            
+            # 合并结果
+            new_ops_list = []
+            rag_iter = iter(rag_results)
+            for op in current_ops_list:
+                if op == "PromptedGenerator":
+                    new_ops_list.append(op)
+                else:
+                    try:
+                        res = next(rag_iter)
+                        new_ops_list.extend(res)
+                    except StopIteration:
+                        # 理论上不应该发生，除非 get_operators_by_rag 返回结果少于查询数
+                        new_ops_list.append(op)
+            return new_ops_list
+
         # 直接使用公共索引进行RAG检索
-        ops_list = get_operators_by_rag(search_queries=ops_list, 
-                                        top_k=1, 
-                                        faiss_index_path=f"{PROJDIR}/dataflow_agent/resources/faiss_cache/all_ops.index",
-                                        base_url=f"{s.request.chat_api_url}embeddings" if s.request.chat_api_url_for_embeddings == "" else s.request.chat_api_url_for_embeddings,
-                                        model_name = s.request.embedding_model_name)
-        ops_list = [item for sub in ops_list for item in sub]
+        ops_list = _safe_rag_retrieve(ops_list, f"{PROJDIR}/dataflow_agent/resources/faiss_cache/all_ops.index")
 
         # 如果要求RAG实时更新，检测未注册的算子；如有则删除索引文件并重跑RAG
         if s.request.update_rag_content:
@@ -276,12 +306,7 @@ def create_pipeline_graph() -> GenericGraphBuilder:
                             pass
 
                 # 重新检索（此时 get_operators_by_rag 会自动重新构建索引）
-                ops_list = get_operators_by_rag(search_queries=ops_list, 
-                                        top_k=1, 
-                                        faiss_index_path=index_path,
-                                        base_url=f"{s.request.chat_api_url}embeddings" if s.request.chat_api_url_for_embeddings == "" else s.request.chat_api_url_for_embeddings,
-                                        model_name = s.request.embedding_model_name)
-                ops_list = [item for sub in ops_list for item in sub]
+                ops_list = _safe_rag_retrieve(ops_list, index_path)
 
         log.warning(f"[recommender_node + RAG ] 推荐算子列表：{ops_list}")
         s["recommendation"] = ops_list
@@ -431,6 +456,6 @@ def create_pipeline_graph() -> GenericGraphBuilder:
 # 暴露出去
 from dataflow_agent.workflow.registry import register
 
-@register("pipelinerecommend")
+@register("pipelinerecommend_kps")
 def factory():
     return create_pipeline_graph()
