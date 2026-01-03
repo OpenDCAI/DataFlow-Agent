@@ -10,7 +10,7 @@ from typing import Any
 from IPython.display import Image, display
 
 from dataflow_agent.state import DFRequest, DFState
-from dataflow_agent.workflow.wf_pipeline_recommend_extract_json_kps import (
+from dataflow_agent.workflow.wf_pipeline_recommend_extract_json import (
     create_pipeline_graph,
 )
 from dataflow_agent.utils import get_project_root
@@ -68,7 +68,7 @@ async def main() -> None:
         language="en",
         chat_api_url="http://123.129.219.111:3000/v1/",
         api_key=os.getenv("DF_API_KEY", "sk-dummy"),
-        model="gemini-2.5-pro",
+        model="gpt-4o",
         json_file=f"{PROJECT_ROOT}/tests/test.jsonl",
         target= "在知识库构建中，需要从语料 PDF 中提取可检索的干净文本。输入源唯一为 PDF（由 MinerUParser 解析）。管线对文本进行清洗与优化（去页眉页脚/水印等）、智能分段、敏感信息脱敏，并通过语义去重剔除重复或无效段落。最终输出唯一为可入库的结构化文本语料（脱敏后的分段文本集合，已完成语义去重），用于向量化检索与知识库入库。",
         python_file_path=str(python_file_path),  # pipeline 的输出脚本路径

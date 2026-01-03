@@ -24,7 +24,7 @@ docstring_parser
 pydantic
 nltk
 colorama
-gradio
+gradio==6.2.0
 
 # text2sql
 func_timeout
