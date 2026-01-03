@@ -247,7 +247,6 @@ agent_cls = AgentRegistry.get("myagent")
 MainState (基础状态)
     ├── DFState              (主流程状态)
     ├── DataCollectionState  (数据采集状态)
-    ├── IconGenState         (图标生成状态)
     ├── WebCrawlState        (网页爬取状态)
     └── PromptWritingState   (提示词生成状态)
 ```
