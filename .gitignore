@@ -27,8 +27,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -233,7 +233,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-dataflow-agent.log*
+dataflow_agent.log*
+dataflow_agent.log.*
 
 # Editor directories and files
 .DS_Store
@@ -259,10 +260,25 @@ nohup.out
 
 invite_codes.txt
 
-frontend-workflow/vite.config.ts
 .vscode
 
 logs/
 conf/
 
 tests/kps_test/
+
+logs
+dev-debug.log
+# Dependency directories
+# Environment variables
+.idea
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 
+
+# Taskmaster AI (local task management)
+.taskmaster/
+
+frontend-workflow/vite.config.ts
