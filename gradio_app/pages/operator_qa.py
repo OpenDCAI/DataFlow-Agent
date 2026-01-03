@@ -237,7 +237,6 @@ def create_operator_qa() -> gr.Blocks:
                 chatbot = gr.Chatbot(
                     label="对话历史",
                     height=500,
-                    show_copy_button=True,
                 )
                 
                 with gr.Row():

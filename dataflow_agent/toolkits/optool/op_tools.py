@@ -28,13 +28,6 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from dataflow.utils.registry import OPERATOR_REGISTRY
-# import dataflow_kps
-
-import dataflow_kps
-from dataflow_kps import operators
-from dataflow_kps.operators import case1
-
-print("OPERATOR_REGISTRY.get_obj_map(): ", OPERATOR_REGISTRY.get_obj_map())
 
 from langchain_core.tools import tool
 from dataflow_agent.logger import get_logger
