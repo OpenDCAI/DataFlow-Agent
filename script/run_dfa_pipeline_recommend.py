@@ -70,10 +70,10 @@ async def main() -> None:
         api_key=os.getenv("DF_API_KEY", "sk-dummy"),
         model="gpt-4o",
         json_file=f"{PROJECT_ROOT}/tests/test.jsonl",
-        target="推荐算子，合成数据，5个！！",
+        target= "给我简单的过滤或者去重算子就好了,只需要2个算子",
         python_file_path=str(python_file_path),  # pipeline 的输出脚本路径
-        need_debug= False,  # 是否需要 Debug
-        max_debug_rounds= 3,
+        need_debug= True,  # 是否需要 Debug
+        max_debug_rounds= 5,
         session_id=session_id,
         cache_dir="dataflow_cache"
     )

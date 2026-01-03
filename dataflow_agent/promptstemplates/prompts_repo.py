@@ -75,39 +75,54 @@ The fields are as follows:
 # --------------------------------------------------------------------------- #
 class TargetParsing:
     system_prompt_for_target_parsing = """
-You are a data processing pipeline analysis expert. Your task is to decompose the user's data processing requirements into specific operator functionality descriptions.
+你是一名数据处理流水线分析专家。你的任务是将用户的数据处理需求拆解为具体的算子（operator）功能描述。
 """
 
     task_prompt_for_target_parsing = """
-[ROLE] You are a data processing requirement analyzer.
+[角色] 你是一名数据处理需求分析员。
 
-[TASK]
-Analyze the user's data processing requirement and decompose it into a series of specific operator functionality descriptions.
-
-Each description should:
-1. Clearly describe the functionality of a single operator
-2. Be arranged in the logical order of data processing
-3. Use concise language
-
-User requirement:
+[任务]
+分析用户的数据处理需求，并将其拆解为一系列具体的算子功能描述。
+用户需求：
 {target}
 
-[OUTPUT RULES]
-Return a JSON object with the following structure:
+每条描述应当：
+1. 清晰描述单个算子的功能
+2. 按照数据处理的逻辑顺序排列
+数据处理一般分为如下几个阶段：
+
+   - 数据解析
+   - 数据分块
+   - 数据清洗
+   - 数据生成
+   - 数据提取
+   - 质量评估
+   - 输出
+
+你也应该根据这些阶段 + 目标，来逐个拆解成对应阶段的算子；
+
+3. 使用简洁的语言表述，但是要具体，比如 如果第一步是解析，那么要说明对什么类型文件解析？比如PDF文件，WORD文件，
+要是需求里面无法告知可以不写或者简单写；
+（要把需求 - 拆分成一个一个符合 阶段的 ，可以执行的算子）
+
+[输出规则]
+返回一个 JSON 对象，结构如下：
 {{
-  "operator_descriptions": ["description1", "description2", "description3", ...]
+  "operator_descriptions": ["描述1", "描述2", "描述3", ...]
 }}
 
-Each description should be a clear, concise statement of what one operator should do.
+每条描述都应是对“一个算子要做什么”的清晰、简洁陈述。
 
-[EXAMPLE]
-Input: "过滤掉长度小于10的文本，然后去重，最后提取关键词"
-Output:
+[示例]
+输入："过滤掉长度小于10的文本，然后去重，最后提取关键词"
+输出：
 {{
   "operator_descriptions": [
+    "读取解析pdf成纯文本",
     "过滤掉长度小于10个字符的文本数据",
     "对文本数据进行去重处理，移除重复内容",
-    "从文本中提取关键词"
+    "从文本数据中提取关键词"
+    ...
   ]
 }}
 """
@@ -117,79 +132,85 @@ Output:
 # --------------------------------------------------------------------------- #
 class RecommendationInferencePipeline:
     system_prompt_for_recommendation_inference_pipeline = """
-You are a data processing expert. Please generate a structured JSON report according to the user's question.
-Based on the user's knowledge base data, you will recommend a suitable data processing pipeline composed of multiple processing nodes.
-You need to analyze the user's data types and content, then recommend an appropriate pipeline accordingly.
+你是一名数据处理专家。请根据用户的问题生成结构化的 JSON 报告。
+基于用户知识库中的数据，你将推荐一条由多个处理节点组成的合适数据处理流水线（pipeline）。
+你需要分析用户的数据类型与内容，然后据此推荐适当的流水线。
 """
 
     task_prompt_for_recommendation_inference_pipeline = """
-[ROLE] You are a data governance workflow recommendation system.
-You need to automatically select appropriate operator nodes and assemble a complete data processing pipeline based on contextual information.
+[角色] 你是一个数据治理工作流推荐系统。
+你需要根据上下文信息，自动选择合适的算子节点，并组装成完整的数据处理流水线。
 
-[INPUT]
-You will receive the following information:
-The requirements that the pipeline must meet:
+[输入]
+你将收到以下信息：
+流水线必须满足的需求：
 ========
 {target}
 ========
-Sample data information:
+样例数据信息：
 ========
 {sample}
 ========
-The list of available operators for each data type:
+各数据类型可用的算子列表：
 ============================
 {operator}
 ============================
 
-[key rules]
-1. Follow Execution Order:
-  Data generation must occur before data extraction
-  Data extraction must occur before data validation
-  Correct order: Filter → Generate → Extract → Validate
-  Incorrect order: Filter → Extract → Generate
-2 .Validate Data Availability:
-  Check sample data to confirm which fields already exist
-  If an operator requires field "X" but it's not present in the sample data, ensure a preceding operator creates it
-3. Important!!!
-If the provided built‑in operators cannot meet the requirements – for example:
-“Automatically identify the document type (national standard vs. local standard); extract the fire‑protection topic from the document content” –
-then these must be handled separately by using two custom operators, such as:
+[关键规则]
+1. 遵循执行顺序：
+   - 数据解析
+   - 数据分块
+   - 数据清洗
+   - 数据生成
+   - 数据提取
+   - 质量评估
+   - 输出
+
+   每个阶段不是只能有一个算子，而是遵循 “需求”；
+
+2. 校验数据可用性：
+  检查样例数据，确认哪些字段已存在
+  若某算子需要字段“X”但样例数据中不存在，必须确保在它之前有算子创建该字段
+  
+3. 重要！！！
+如果提供的内置算子无法满足需求——例如：
+“自动识别文档类型（国家标准 vs. 地方标准）；从文档内容中抽取消防主题”——
+则必须通过两个自定义算子分别处理，使用自定义算子示例：
   "name": "PromptedGenerator",
-  "description": "Generate data based on a user-provided prompt. Combines a system prompt and the input content to produce output text that meets the requirements. Input parameters:\n- llm_serving: LLM service object that implements the LLMServingABC interface\n- system_prompt: system prompt that defines model behavior, default 'You are a helpful agent.'\n- input_key: name of the input content field, default 'raw_content'\n- output_key: name of the output content field, default 'generated_content'\nOutput:\n- A DataFrame containing the generated content\n- The name of the output field, for downstream operators to reference",
+  "description": "根据用户提供的 prompt 生成数据。将 system prompt 与输入内容结合，输出满足要求的文本。输入参数：\n- llm_serving: 实现 LLMServingABC 接口的 LLM 服务对象\n- system_prompt: 定义模型行为的系统提示词，默认 'You are a helpful agent.'\n- input_key: 输入内容字段名，默认 'raw_content'\n- output_key: 输出内容字段名，默认 'generated_content'\n输出：\n- 包含生成内容的 DataFrame\n- 下游算子可引用的输出字段名",
   {
     "name": "system_prompt",
-    "default": "You are a legal expert in fire safety. Based on the following content, determine whether it is a national standard or a local standard. Answer only with “国家标准” or “地方标准”, and do not add any other content.",
+    "default": "你是一名消防安全法律专家。请基于以下内容判断其属于国家标准还是地方标准。仅回答“国家标准”或“地方标准”，不要添加任何其他内容。",
     "kind": "POSITIONAL_OR_KEYWORD"
   }
   ......
 
-[Common Error Patterns to Avoid]
-Incorrect Example: ["FilterData", "ExtractAnswer", "GenerateAnswer"]
-Problem: Attempting to extract the answer before it is generated
+[需要避免的常见错误模式]
+错误示例：["FilterData", "ExtractAnswer", "GenerateAnswer"]
+问题：在生成答案之前就尝试抽取答案
 
-Correct Example: ["FilterData", "GenerateAnswer", "ExtractAnswer"]
-Reason: Generate first, then extract
+正确示例：["FilterData", "GenerateAnswer", "ExtractAnswer"]
+原因：先生成，再抽取
 
-Incorrect Example: ["ValidateAnswer", "GenerateAnswer"]
-Problem: Validating an answer that does not exist yet
+错误示例：["ValidateAnswer", "GenerateAnswer"]
+问题：在答案尚未生成时就进行校验
 
-Correct Example: ["GenerateAnswer", "ExtractAnswer", "ValidateAnswer"]
-Reason: Complete data flow
+正确示例：["GenerateAnswer", "ExtractAnswer", "ValidateAnswer"]
+原因：数据流必须完整
 
-[OUTPUT RULES]
-1. Please select suitable operator nodes for each type and return them in the following JSON format, more than {op_nums} operators:
+[输出规则]
+1. 请为每种类型选择合适的算子节点，并按以下 JSON 格式返回，算子数量需多于 {op_nums} 个：
 {{
   "ops": ["OperatorA", "OperatorB", "OperatorC"],
-  "reason": "State your reasoning here. For example: this process involves multi-level data preprocessing and quality filtering, sequentially performing language filtering, format standardization, noise removal, privacy protection, length and structure optimization, as well as symbol and special character handling to ensure the text content is standardized, rich, and compliant."
+  "reason": "在此说明你的理由。例如：该流程涉及多层级数据预处理与质量过滤，依次执行语言过滤、格式标准化、噪声清理、隐私保护、长度与结构优化，以及符号与特殊字符处理，以确保文本内容标准化、信息密度高且合规。"
 }}
-2  Only the names of the operators are needed.
-3. Verify whether the selected operators and their order fully satisfy all requirements specified in {target}.If they do not, you must add a PromptedGenerator.
-4. PromptedGenerator must be inserted into the operator sequence to generate content that meets the specific requirement.
-You may have multiple PromptedGenerator operators, with one PromptedGenerator per requirement.
+2. 只需要返回算子名称（name）即可。
+3. 请验证所选算子及其顺序是否完全满足 {target} 中指定的全部需求；若不能满足，必须添加 PromptedGenerator。
+4. 必须将 PromptedGenerator 插入到算子序列中，用于生成满足特定需求的内容。
+可包含多个 PromptedGenerator，并遵循“一项需求对应一个 PromptedGenerator”的原则。
 
-
-[Question]
-Based on the above rules, what pipeline should be recommended???
+[问题]
+基于以上规则，应推荐什么样的流水线（pipeline）？
 """
 
 # --------------------------------------------------------------------------- #

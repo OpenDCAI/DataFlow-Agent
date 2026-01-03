@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 from dataflow.utils.registry import OPERATOR_REGISTRY
+
 from langchain_core.tools import tool
 from dataflow_agent.logger import get_logger
 
@@ -168,6 +169,7 @@ def _dump_all_ops_to_file() -> Dict[str, List[Dict[str, Any]]]:
     if hasattr(OPERATOR_REGISTRY, "_init_loaders"):
         OPERATOR_REGISTRY._init_loaders()
     if hasattr(OPERATOR_REGISTRY, "_get_all"):
+        log.critical(f"[_dump_all_ops_to_file]: if hasattr(OPERATOR_REGISTRY, _get_all):")
         OPERATOR_REGISTRY._get_all()
 
     all_ops: Dict[str, List[Dict[str, Any]]] = {}
@@ -292,6 +294,7 @@ def get_operators_info_by_names(operator_names: List[str]) -> str:
     if hasattr(OPERATOR_REGISTRY, "_init_loaders"):
         OPERATOR_REGISTRY._init_loaders()
     if hasattr(OPERATOR_REGISTRY, "_get_all"):
+        log.critical(f"[get_operators_info_by_names]: if hasattr(OPERATOR_REGISTRY, _get_all):")
         OPERATOR_REGISTRY._get_all()
     
     # 构建名称到类的映射
@@ -346,6 +349,7 @@ def get_operator_source_by_name(operator_name: str) -> str:
         if hasattr(OPERATOR_REGISTRY, "_init_loaders"):
             OPERATOR_REGISTRY._init_loaders()
         if hasattr(OPERATOR_REGISTRY, "_get_all"):
+            log.critical(f"[get_operator_source_by_name]: if hasattr(OPERATOR_REGISTRY, _get_all):")
             OPERATOR_REGISTRY._get_all()
         
         # 遍历注册的算子，找到匹配的名称
@@ -399,7 +403,7 @@ def get_prompt_sources_of_operator(op_name: str) -> Dict[str, str]:
 
 def post_process_combine_pipeline_result(results: Dict) -> str:
 
-    return "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
+    return "组装成功！退出调用工具循环！！！！"
 
 
 # if __name__ == "__main__":
