@@ -2,13 +2,20 @@ from dataclasses import dataclass, field
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from dataflow.cli_funcs.paths import DataFlowPath
 current_file = Path(__file__).resolve()
 
-BASE_DIR = DataFlowPath.get_dataflow_dir()
-DATAFLOW_DIR = BASE_DIR.parent
-STATICS_DIR = DataFlowPath.get_dataflow_statics_dir()
 PROJDIR = current_file.parent.parent
+
+try:
+    from dataflow.cli_funcs.paths import DataFlowPath  # type: ignore
+
+    BASE_DIR = Path(DataFlowPath.get_dataflow_dir())
+    DATAFLOW_DIR = BASE_DIR.parent
+    STATICS_DIR = Path(DataFlowPath.get_dataflow_statics_dir())
+except Exception:
+    BASE_DIR = Path(os.getenv("DATAFLOW_DIR", str(PROJDIR))).resolve()
+    DATAFLOW_DIR = BASE_DIR.parent
+    STATICS_DIR = Path(os.getenv("DATAFLOW_STATICS_DIR", str(PROJDIR / "statics"))).resolve()
 
 from typing_extensions import TypedDict, Annotated
 from langgraph.graph.message import add_messages
@@ -138,25 +145,6 @@ class DataCollectionState(MainState):
     downloads: Dict[str, list] = field(default_factory=dict)
     sources: Dict[str, Dict] = field(default_factory=dict)
 
-# Iconagent相关 State 和 Request 定义
-# ==================== Icon 生成 Request ====================
-@dataclass
-class IconGenRequest(MainRequest):      
-    keywords: str = ""
-    style: str = ""
-    prev_image: str = ""
-    edit_prompt: str = ""
-
-# ==================== Icon 生成 State ======================
-@dataclass
-class IconGenState(MainState):
-    request: IconGenRequest = field(default_factory=IconGenRequest)
-
-    # 下面是 icongen 自己的产物 / 临时数据
-    icon_prompt: str = ""                                 # 生成的图标提示词
-    img_save_path: str = ""                              # 生成的图标保存路径
-
-
 # ==================== Web 爬取/研究 Request ====================
 @dataclass
 class WebCrawlRequest(MainRequest):
@@ -227,37 +215,6 @@ class PromptWritingState(MainState):
     prompt_args: Dict[str, Any] = field(default_factory=dict)
     prompt_output_format: Dict[str, Any] = field(default_factory=dict)
     delete_test_files: bool = True
-
-# Paper2Video 相关 State 和 Request 定义
-# ==================== Paper2Video 生成 Request ====================
-
-@dataclass
-class Paper2VideoRequest(MainRequest):
-    paper_pdf_path: str = ""
-    user_imgs_path: str = ""
-    
-    ref_audio_path: str = ""
-
-# ==================== Paper2Video 生成 State ======================
-@dataclass
-class Paper2VideoState(MainState):
-    # 重写 request
-    request: Paper2VideoRequest = field(default_factory=Paper2VideoRequest)
-    
-    # paper2video 特有字段
-    beamer_code_path: str = ""
-    is_beamer_wrong: bool = False
-    is_beamer_warning: bool = False
-    code_debug_result: str = ""
-    ppt_path: str = ""
-    
-    # 生成字幕 + cursor的位置信息
-    slide_img_dir: str = ""
-    subtitle_and_cursor: List[str] = field(default_factory=list)
-    subtitle_and_cursor_path: str = ""
-    
-    # 生成的音频路径
-    speech_save_dir: str = ""
 
 
 
@@ -373,112 +330,3 @@ class PlanningState(MainState):
             "replanning_count": self.replanning_count,
             "available_tools": self.executor_tools,
         }
-
-@dataclass
-class Paper2FigureRequest(MainRequest):
-    gen_fig_model: str = "gemini-2.5-flash-image-preview"
-    # gen_fig_model: str = "gemini-3-pro-image-preview"
-    sam2_model: str = "models/facebook/sam2.1-hiera-tiny"
-    bg_rm_model: str = "models/RMBG-2.0"
-    input_type: str = "PDF"
-    #  科研绘图复杂度    
-    figure_complex: str = "hard"
-    style: str = "kartoon"
-
-    # PPT的页面数量 
-    page_count: int = 10
-    # 是否编辑完毕，也就是是否需要重新生成完整的 PPT
-    all_edited_down: bool = False
-
-    # pdf2ppt是否使用AI编辑
-    use_ai_edit: bool = False
-
-@dataclass
-class Paper2FigureState(MainState):
-    request: Paper2FigureRequest = field(default_factory=Paper2FigureRequest)
-    fig_desc: str = ''
-    aspect_ratio: str = '16:9'
-    paper_file: str = ''
-    # 原始带内容的图像路径
-    fig_draft_path: str = ''
-    # MinerU 解析得到的内容元素（文本 / 图片 / 表格等）
-    fig_mask: List[Dict[str, Any]] = field(default_factory=list)
-    # 二次编辑后的空框模板图（仅外层矩形和箭头）
-    fig_layout_path: str = ''
-    # SAM + SVG + EMF 形成的布局元素（仅背景框架层）
-    layout_items: List[Dict[str, Any]] = field(default_factory=list)
-    result_path: str = ''
-    ppt_path: str = ''
-    mask_detail_level: int = 2
-    paper_idea: str = ''
-    input_type: str = 'PDF'
-
-    # 技术路线图使用属性 ==============================
-    figure_tec_svg_content: str = ""
-    svg_img_path: str = ""
-    mineru_port: int = 8010
-    svg_file_path: str = ""  # svg 带文字图的 地址
-    svg_bg_file_path: str = ""
-    # 带文字版本的svg图片
-    svg_full_img_path: str = ""
-    # 背景svg code：
-    svg_bg_code : str = ""
-    
-    # 实验统计图使用属性 ==============================
-    # ===== 输入 =====
-    pre_tool_results: Dict[str, Any] = field(default_factory=dict)  # 前置工具结果注入
-
-    # ===== 中间结果 =====
-    paper_idea: str = ''                                          # 论文核心思想
-    extracted_tables: List[Dict[str, Any]] = field(default_factory=list)  # 从 MinerU 提取的表格列表
-    # 每个表格格式: {"table_id": str, "headers": List[str], "rows": List[List[str]], "caption": str}
-
-    chart_configs: Dict[str, Dict[str, Any]] = field(default_factory=dict)     # 图表配置字典
-    # 每个配置格式: {table_id: {"table_id": str, "chart_type": str, "x_column": str, "y_columns": List[str], ...}}
-
-    generated_codes: Dict[str, Dict[str, Any]] = field(default_factory=dict)   # 生成的代码字典
-    # 每个代码格式: {table_id: {"table_id": str, "code": str}}
-
-    # ===== 输出 =====
-    generated_charts: Dict[str, str] = field(default_factory=dict)             # 生成的图表路径字典
-    stylize_results: Dict[str, list] = field(default_factory=dict)             # 风格化后的图表路径字典
-
-    svg_bg_code: str = ""
-
-    # paper2ppt 专用 ==============================
-    # 首次生成整套页面图是否已完成；False 走批量生成，True 走按页二次编辑
-    gen_down: bool = False
-    # 0-based: 要二次编辑的页号
-    edit_page_num: int = -1
-    # 二次编辑提示词（用于 edit_page_num 对应页）
-    edit_page_prompt: str = ""
-    # 批量生成出来的页面图片路径（0-based 对齐 pagecontent）
-    generated_pages: List[str] = field(default_factory=list)
-    table_img_path: str = ""
-
-    # pagecontent: 既可为结构化 slide 描述，也可为 [{"ppt_img_path": "..."}] 的图片列表
-    pagecontent: list[dict] = field(default_factory=list)
-    minueru_output: str = ""
-    mineru_root: str = ""
-    text_content: str = ""
-    # 生成的 PPT PDF 路径
-    ppt_pdf_path: str = ""
-    ppt_pptx_path: str = ""
-
-    # 长文PPT专用：
-    long_text: str = ""
-    target_pages: int = 60
-    pages_per_batch: int = 10
-    pages_to_generate: int = 12
-    max_rounds: int = 1
-    current_chunk: str = ""
-    current_text: str = ""
-
-    # pdf2ppt 专用 ==============================
-    pdf_file: str = ""
-    slide_images: List[str] = field(default_factory=list)
-    ocr_pages: List[str] = field(default_factory=list)
-    sam_pages: List[str] = field(default_factory=list)
-    mineru_pages: List[Dict[str, Any]] = field(default_factory=list)
-    # pdf2ppt是否使用AI编辑
-    use_ai_edit: bool = False
