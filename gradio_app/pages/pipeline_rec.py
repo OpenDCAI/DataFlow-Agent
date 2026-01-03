@@ -81,15 +81,17 @@ def create_pipeline_rec():
                     value=True
                 )
                 
-                # 调试配置（暂时禁用）
-                # gr.Markdown("### 调试配置")
-                # debug_mode = gr.Checkbox(label="启用调试模式", value=False)
-                # debug_times = gr.Dropdown(
-                #     label="调试模式执行次数",
-                #     choices=[1, 2, 3, 5, 10],
-                #     value=2,
-                #     visible=False
-                # )
+                # 调试配置
+                gr.Markdown("### 调试配置")
+                debug_mode = gr.Checkbox(label="启用调试模式", value=False)
+                debug_times = gr.Dropdown(
+                    label="调试模式执行次数",
+                    choices=[1, 2, 3, 5, 10],
+                    value=2,
+                    visible=False,
+                    allow_custom_value=True,
+                    interactive=True
+                )
                 
                 submit_btn = gr.Button("🚀 Generate Pipeline", variant="primary", size="lg")
 
@@ -144,6 +146,15 @@ def create_pipeline_rec():
         # （调试模式相关 UI 已下线，如需恢复请参考 git 历史记录）
 
         # ---------------------- 生成 Pipeline 回调 ----------------------
+        def toggle_debug_times(debug_enabled):
+            return gr.update(visible=debug_enabled)
+
+        debug_mode.change(
+            toggle_debug_times,
+            inputs=[debug_mode],
+            outputs=[debug_times]
+        )
+
         async def generate_pipeline(
             target_text, 
             json_path, 
@@ -154,6 +165,8 @@ def create_pipeline_rec():
             chat_api_url_for_embeddings_val,
             embedding_model_name_val,
             update_rag_val,
+            debug_mode_val,
+            debug_times_val,
             current_json_state,
             current_round_state,
             current_api_config
@@ -161,12 +174,12 @@ def create_pipeline_rec():
             result = await run_pipeline_workflow(
                 target=target_text,
                 json_file=json_path,
-                need_debug=False,
+                need_debug=debug_mode_val,
                 session_id=session_id_val,
                 chat_api_url=chat_api_url_val,
                 api_key=api_key_val,
                 model_name=model_name_val,
-                max_debug_rounds=2,
+                max_debug_rounds=int(debug_times_val) if debug_times_val else 2,
                 chat_api_url_for_embeddings=chat_api_url_for_embeddings_val,
                 embedding_model_name=embedding_model_name_val,
                 update_rag_content=update_rag_val

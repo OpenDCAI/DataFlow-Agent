@@ -30,20 +30,33 @@
 
 ## 📑 目录
 
-- [特性](#特性)
-- [功能概览](#功能概览)
-- [功能详情](#功能详情)
-- [快速开始](#-快速开始)
-- [启动 UI（Gradio）](#启动-ui-gradio)
-- [CLI 使用](#cli-使用)
-- [工作流（Workflows）](#工作流workflows)
-- [配置与环境变量](#配置与环境变量)
-- [文档（MkDocs）](#文档mkdocs)
-- [项目结构](#项目结构)
-- [Roadmap](#roadmap)
-- [贡献](#贡献)
-- [License](#license)
-- [加入社区](#加入社区)
+- [DataFlow-Agent](#dataflow-agent)
+  - [📑 目录](#-目录)
+  - [特性](#特性)
+  - [功能概览](#功能概览)
+  - [功能详情](#功能详情)
+    - [PromptAgent Frontend](#promptagent-frontend)
+    - [Op Assemble Line](#op-assemble-line)
+    - [Operator QA](#operator-qa)
+    - [Operator Write](#operator-write)
+    - [Pipeline Rec](#pipeline-rec)
+    - [Web Collection](#web-collection)
+  - [🚀 快速开始](#-快速开始)
+    - [1) 克隆仓库](#1-克隆仓库)
+    - [2) 创建虚拟环境](#2-创建虚拟环境)
+    - [3) 安装依赖](#3-安装依赖)
+  - [启动 UI（Gradio）](#启动-uigradio)
+  - [CLI 使用](#cli-使用)
+  - [工作流（Workflows）](#工作流workflows)
+  - [配置与环境变量](#配置与环境变量)
+    - [LLM 相关](#llm-相关)
+    - [路径相关（可选）](#路径相关可选)
+  - [文档（MkDocs）](#文档mkdocs)
+  - [项目结构](#项目结构)
+  - [Roadmap](#roadmap)
+  - [贡献](#贡献)
+  - [License](#license)
+  - [加入社区](#加入社区)
 
 ---
 
@@ -170,6 +183,11 @@ cd DataFlow-Agent
 ```bash
 python -m venv venv
 source venv/bin/activate  # Windows: venv\\Scripts\\activate
+
+or
+
+conda create -n myenv python=3.11
+conda activate myenv
 ```
 
 ### 3) 安装依赖
@@ -177,14 +195,7 @@ source venv/bin/activate  # Windows: venv\\Scripts\\activate
 开发/本地调试推荐：
 
 ```bash
-pip install -r requirements-dev.txt
-pip install -e .
-```
-
-生产/最小安装（仅基础依赖）：
-
-```bash
-pip install -r requirements.txt
+pip install -r requirements-data.txt
 pip install -e .
 ```
 
