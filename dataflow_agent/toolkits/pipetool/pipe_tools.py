@@ -913,6 +913,10 @@ self.llm_serving = APILLMServing_request(
     max_workers=100,
 )'''
     log.critical(f'[build_pipeline_code_with_full_params]: {chat_api_url}')
+    
+    # 处理缩进问题
+    llm_block = indent_block(llm_block, 8)
+    
     # 6) 模板
     template = '''"""
 Auto-generated Pipeline (supports init + run params)
