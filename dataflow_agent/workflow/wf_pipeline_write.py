@@ -20,9 +20,24 @@ from dataflow_agent.agentroles.data_agents.oprewriter import create_rewriter
 from dataflow_agent.agentroles.data_agents.append_llm_serving import create_llm_append_serving
 from dataflow_agent.agentroles.data_agents.instantiator import create_llm_instantiator
 from dataflow_agent.utils import get_project_root
-
-from dataflow_agent.utils import get_project_root
 PROJDIR = get_project_root()
+
+
+def _get_llm_model_name(state: DFState, default: str = "gpt-4o") -> str:
+    """Resolve model name from request/state to avoid hard-coded defaults."""
+    try:
+        req = getattr(state, "request", None)
+        for attr in ("model", "model_name", "llm_model", "chat_model"):
+            val = getattr(req, attr, None) if req is not None else None
+            if isinstance(val, str) and val.strip():
+                return val.strip()
+        tmp = getattr(state, "temp_data", {}) or {}
+        val = tmp.get("model") or tmp.get("model_name")
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    except Exception:
+        pass
+    return default
 
 def create_operator_write_graph() -> GenericGraphBuilder:
     """Build the operator write workflow graph.
@@ -170,12 +185,13 @@ def create_operator_write_graph() -> GenericGraphBuilder:
 
     @builder.pre_tool("llm_serving_snippet", "llm_append_serving")
     def pre_llm_serving_snippet(state: DFState):
+        model_name = _get_llm_model_name(state)
         return (
             "# -------- LLM Serving (Remote) --------\n"
             "self.llm_serving = APILLMServing_request(\n"
             '    api_url="http://123.129.219.111:3000/v1/chat/completions",\n'
             '    key_name_of_api_key="DF_API_KEY",\n'
-            '    model_name="gpt-4o",\n'
+            f'    model_name="{model_name}",\n'
             "    max_workers=100,\n"
             ")\n"
         )
@@ -291,7 +307,7 @@ def create_operator_write_graph() -> GenericGraphBuilder:
         code_str = s.temp_data.get("pipeline_code", "") or getattr(s, "draft_operator_code", "")
         if code_str and ("self.llm_serving" in code_str or "APILLMServing_request" in code_str):
             return s
-        agent = create_llm_append_serving(tool_manager=get_tool_manager(), model_name="gpt-4o")
+        agent = create_llm_append_serving(tool_manager=get_tool_manager(), model_name=_get_llm_model_name(s))
         s2 = await agent.execute(s, use_agent=True)
         # 若 LLM 产出不可用，回退一次硬注入（保底）
         code_str2 = s2.temp_data.get("pipeline_code", "") or getattr(s2, "draft_operator_code", "")
@@ -320,20 +336,20 @@ def create_operator_write_graph() -> GenericGraphBuilder:
     async def rewriter_node(s: DFState) -> DFState:
         from dataflow_agent.toolkits.tool_manager import get_tool_manager
 
-        rewriter = create_rewriter(tool_manager=get_tool_manager(), model_name="o3")
+        rewriter = create_rewriter(tool_manager=get_tool_manager(), model_name=_get_llm_model_name(s))
         return await rewriter.execute(s, use_agent=True)
 
     def after_rewrite_node(s: DFState) -> DFState:
         from dataflow_agent.toolkits.tool_manager import get_tool_manager
 
-        rewriter = create_rewriter(tool_manager=get_tool_manager(), model_name="o3")
+        rewriter = create_rewriter(tool_manager=get_tool_manager(), model_name=_get_llm_model_name(s))
         return rewriter.after_rewrite(s)
 
     # ---------------- 新增：实例化节点（LLM 生成可运行入口 + 执行验证） ----------------
     async def instantiate_operator_main_node(s: DFState) -> DFState:
         from dataflow_agent.toolkits.tool_manager import get_tool_manager
         try:
-            agent = create_llm_instantiator(tool_manager=get_tool_manager(), model_name="gpt-4o")
+            agent = create_llm_instantiator(tool_manager=get_tool_manager(), model_name=_get_llm_model_name(s))
             s2 = await agent.execute(s, use_agent=True)
             code_str = s2.temp_data.get("pipeline_code", "") or getattr(s2, "draft_operator_code", "")
             if not code_str:
