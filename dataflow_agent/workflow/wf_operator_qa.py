@@ -144,6 +144,20 @@ def create_operator_qa_graph() -> GenericGraphBuilder:
         - 多轮对话（由 BaseAgent 通过 messages 数组管理）
         - 工具调用（检索算子、获取源码、参数等）
         """
+        # ==================== [修复begin] ====================
+        # 1. 从 state 中提取最新的 API Key
+        current_api_key = state.request.api_key
+        
+        # 2. 如果 rag_service 的 key 是空的，或者与当前 key 不一致，则更新它
+        if current_api_key and rag_service.api_key != current_api_key:
+            log.info(f"同步 API Key 到 RAG Service...")
+            rag_service.api_key = current_api_key
+            
+            # 3. 强制重置内部的 searcher，确保下次调用 _get_searcher 时使用新 Key 重新加载
+            # (因为 RAGOperatorSearch 实例一旦创建，key 可能是旧的)
+            rag_service._searcher = None 
+        # ==================== [修复end] ====================
+
         # 多轮对话：如果有历史消息，追加新的用户问题
         # 第一轮时 state.messages 为空，由 build_messages 构建 system + user
         # 后续轮次手动追加用户问题，避免 build_messages 不被调用导致新问题丢失
