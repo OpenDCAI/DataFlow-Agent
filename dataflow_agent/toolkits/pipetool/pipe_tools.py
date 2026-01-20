@@ -17,6 +17,27 @@ from typing import Any, Dict, List, Tuple
 
 from dataflow_agent.logger import get_logger
 from dataflow.utils.registry import OPERATOR_REGISTRY
+from typing import Optional
+
+#加一个统一的解析函数
+def _resolve_model_name(state: Optional[DFState], model_name: Optional[str], default: str = "gpt-4o") -> str:
+    """
+    优先级：
+    1) 调用方显式传入 model_name
+    2) state.request.model
+    3) default
+    """
+    if isinstance(model_name, str) and model_name.strip():
+        return model_name.strip()
+    try:
+        req = getattr(state, "request", None)
+        val = getattr(req, "model", None) if req is not None else None
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    except Exception:
+        pass
+    return default
+
 
 log = get_logger(__name__)
 
@@ -857,15 +878,17 @@ def render_operator_blocks_with_full_params(
 
 def build_pipeline_code_with_full_params(
     opname_and_params: List[Dict[str, Any]],
-    *,
+    state: Optional[DFState] = None,
+        *,
     cache_dir: str = "./cache_local",
     llm_local: bool = False,
     local_model_path: str = "",
     chat_api_url: str = "",
-    model_name: str = "gpt-4o",
+    model_name: Optional[str] = None,
     file_path: str = "",
     prompted_generator_prompts: Optional[Dict[int, str]] = None,
 ) -> str:
+    resolved_model_name = _resolve_model_name(state, model_name)
     """构建完整的 pipeline 代码（支持 init + run 参数）"""
     log.critical(f'[build_pipeline_code_with_full_params]: {chat_api_url}')
     # 清空之前的额外导入
@@ -902,14 +925,14 @@ self.llm_serving = LocalModelLLMServing_vllm(
     vllm_tensor_parallel_size=1,
     vllm_max_tokens=8192,
     hf_local_dir="local",
-    model_name="{model_name}",
+    model_name="{resolved_model_name}",
 )'''
     else:
         llm_block = f'''# -------- LLM Serving (Remote) --------
 self.llm_serving = APILLMServing_request(
     api_url="{chat_api_url}chat/completions",
     key_name_of_api_key="DF_API_KEY",
-    model_name="{model_name}",
+    model_name="{resolved_model_name}",
     max_workers=100,
 )'''
     log.critical(f'[build_pipeline_code_with_full_params]: {chat_api_url}')
@@ -1064,7 +1087,7 @@ def build_pipeline_code_with_run_params(
     llm_local: bool = False,
     local_model_path: str = "",
     chat_api_url: str = "",
-    model_name: str = "gpt-4o",
+    model_name: Optional[str] = None,
     file_path: str = "",
     prompted_generator_prompts: Optional[Dict[int, str]] = None 
 ) -> str:
@@ -1095,6 +1118,8 @@ def build_pipeline_code_with_run_params(
     Returns:
         生成的 pipeline 代码字符串
     """
+    resolved_model_name = _resolve_model_name(state, model_name)
+
     # 1) 提取所有算子名称
     op_names = [item["op_name"] for item in opname_and_params]
     
@@ -1135,7 +1160,7 @@ self.llm_serving = LocalModelLLMServing_vllm(
     vllm_tensor_parallel_size=1,
     vllm_max_tokens=8192,
     hf_local_dir="local",
-    model_name="{model_name}",
+    model_name="{resolved_model_name}",
 )
 """
     else:
@@ -1144,7 +1169,7 @@ self.llm_serving = LocalModelLLMServing_vllm(
 self.llm_serving = APILLMServing_request(
     api_url="{chat_api_url}chat/completions",
     key_name_of_api_key="DF_API_KEY",
-    model_name="{model_name}",
+    model_name="{resolved_model_name}",
     max_workers=100,
 )
 """
@@ -1240,10 +1265,11 @@ def build_pipeline_code(
     llm_local: bool = False,
     local_model_path: str = "",
     chat_api_url: str = "",
-    model_name: str = "gpt-4o",
+    model_name: Optional[str] = None,
     file_path: str = "",
     prompted_generator_prompts: Optional[Dict[int, str]] = None,  # ← 添加这个参数
 ) -> str:
+    resolved_model_name = _resolve_model_name(state, model_name)
     # 1) 根据 file_path 后缀判断 cache_type
     file_suffix = Path(file_path).suffix.lower() if file_path else ""
     if file_suffix == ".jsonl":
@@ -1281,7 +1307,7 @@ self.llm_serving = LocalModelLLMServing_vllm(
     vllm_tensor_parallel_size=1,
     vllm_max_tokens=8192,
     hf_local_dir="local",
-    model_name="{model_name}",
+    model_name="{resolved_model_name}",
 )
 """
     else:
@@ -1290,7 +1316,7 @@ self.llm_serving = LocalModelLLMServing_vllm(
 self.llm_serving = APILLMServing_request(
     api_url="{chat_api_url}chat/completions",
     key_name_of_api_key="DF_API_KEY",
-    model_name="{model_name}",
+    model_name="{resolved_model_name}",
     max_workers=100,
 )
 """
