@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import json
 from dataflow_agent.state import DFState
 from dataflow_agent.graphbuilder.graph_builder import GenericGraphBuilder
@@ -24,6 +25,24 @@ from dataflow_agent.logger import get_logger
 from dataflow_agent.utils import robust_parse_json
 
 log = get_logger(__name__)
+
+def _resolve_model_name(state: DFState) -> str:
+    """
+    Priority:
+    1) state.request.model
+    2) state.request.get("model", "")
+    3) env var DF_MODEL_NAME
+    4) fallback "gpt-4o"
+    """
+    try:
+        req = getattr(state, "request", None)
+        if req is not None:
+            m = getattr(req, "model", "") or (req.get("model", "") if hasattr(req, "get") else "")
+            if m:
+                return str(m)
+    except Exception:
+        pass
+    return os.getenv("DF_MODEL_NAME", "gpt-4o")
 
 def create_pipeline_refine_graph() -> GenericGraphBuilder:
     """
@@ -61,7 +80,13 @@ def create_pipeline_refine_graph() -> GenericGraphBuilder:
         return summary
 
     async def target_analyzer_node(s: DFState) -> DFState:
-        agent = create_refine_target_analyzer()
+        #创建 agent 的地方改成“优先传 model_name，失败就回退”
+        mn = _resolve_model_name(s)
+        try:
+            agent = create_refine_target_analyzer(model_name=mn)
+        except TypeError:
+            agent = create_refine_target_analyzer()
+        #agent = create_refine_target_analyzer()
         s2 = await agent.execute(s, use_agent=False)
 
         # 基于目标分析输出的子操作描述，逐条做RAG匹配top1算子与代码
@@ -162,7 +187,13 @@ def create_pipeline_refine_graph() -> GenericGraphBuilder:
         return state.agent_results.get("op_contexts", [])
 
     async def refine_planner_node(s: DFState) -> DFState:
-        agent = create_refine_planner()
+        # 创建 agent 的地方改成“优先传 model_name，失败就回退”
+        mn = _resolve_model_name(s)
+        try:
+            agent = create_refine_planner(model_name=mn)
+        except TypeError:
+            agent = create_refine_planner()
+        # agent = create_refine_planner()
         s2 = await agent.execute(s, use_agent=False)
         return s2
 
@@ -198,7 +229,13 @@ def create_pipeline_refine_graph() -> GenericGraphBuilder:
         tm.register_post_tool(get_operator_code_by_name, role="pipeline_refiner")
 
         # 创建 agent 并传入 tool_manager
-        agent = create_json_pipeline_refiner(tool_manager=tm)
+        # 创建 agent 的地方改成“优先传 model_name，失败就回退”
+        mn = _resolve_model_name(s)
+        try:
+            agent = create_json_pipeline_refiner(tool_manager=tm, model_name=mn)
+        except TypeError:
+            agent = create_json_pipeline_refiner(tool_manager=tm)
+        # agent = create_json_pipeline_refiner(tool_manager=tm)
         # 使用 use_agent=True 启用 graph agent 模式，让 LLM 可以调用 RAG 工具
         s2 = await agent.execute(s, use_agent=True)
         # 直接覆盖写回（按需求不做校验）
