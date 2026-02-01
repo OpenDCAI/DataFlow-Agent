@@ -45,6 +45,25 @@ def create_operator_prompt_writing_graph() -> GenericGraphBuilder:
     def pre_get_prompt_example(state: PromptWritingState):
         return get_prompt_sources_of_operator(state.prompt_op_name)
 
+    @builder.pre_tool("output_format", "prompt_writer")
+    def pre_get_output_format(state: PromptWritingState):
+        # PA_frontend.py 中赋值给了 state.prompt_output_format
+        user_input = getattr(state, "prompt_output_format", "")
+        if user_input and user_input.strip():
+            return user_input or ""
+
+    # ---------------- 核心修改：arguments 工具 ----------------
+    @builder.pre_tool("arguments", "prompt_writer")
+    def pre_get_arguments(state: PromptWritingState):
+        # PA_frontend.py 中赋值给了 state.prompt_args
+        user_args = getattr(state, "prompt_args", [])
+        if user_args:
+            # 前端传来的是列表 ['arg1', 'arg2']，需要格式化成描述字符串
+            desc_list = ["用户指定参数："]
+            for arg in user_args:
+                desc_list.append(f"- <{arg}>: 待填入参数")
+            return "\n".join(desc_list) or ""
+
     # ---------------- 前置工具：pipeline_builder ----------------
     @builder.pre_tool("recommendation", "pipeline_builder")
     def pre_get_recommendation(state: PromptWritingState):
