@@ -55,6 +55,8 @@ class PromptWriter(BaseAgent):
             'operator_code': pre_tool_results.get('operator_code', ''),
             'task_description': pre_tool_results.get('task_description', ''),
             'prompt_example': pre_tool_results.get('prompt_example', ''),
+            'arguments': pre_tool_results.get('arguments', ''),
+            'output_format': pre_tool_results.get('output_format', ''),
         }
 
     def get_default_pre_tool_results(self) -> Dict[str, Any]:
@@ -63,19 +65,41 @@ class PromptWriter(BaseAgent):
             'operator_code': '',
             'task_description': '',
             'prompt_example': '',
+            'arguments': '',
+            'output_format': '',
         }
         
     def parse_result(self, content: str) -> Dict[str, Any]:
         import re
-        # 通过正则抽取代码块 ```python ... ``` 内部代码
+        # 策略1: 优先匹配标准```python代码块
         pattern = r"```python(.*?)```"
         match = re.search(pattern, content, re.DOTALL)
         if match:
             code = match.group(1).strip()
             return {"code": code}
-        else:
-            # 若未匹配到，则报错
-            raise ValueError("未匹配到代码块，解析失败")
+        
+        # 策略2: 兜底解析JSON格式（兼容LLM错误输出的情况）
+        try:
+            # 尝试解析JSON
+            json_content = json.loads(content)
+            # 提取JSON中的代码内容
+            if isinstance(json_content, dict) and len(json_content) > 0:
+                # 取第一个value作为代码
+                code = list(json_content.values())[0]
+                if isinstance(code, str) and code.strip():
+                    return {"code": code.strip()}
+        except json.JSONDecodeError:
+            pass
+        
+        # 策略3: 尝试匹配无python标识的代码块（兜底）
+        pattern_no_lang = r"```(.*?)```"
+        match_no_lang = re.search(pattern_no_lang, content, re.DOTALL)
+        if match_no_lang:
+            code = match_no_lang.group(1).strip()
+            return {"code": code}
+        
+        # 所有策略失败则报错
+        raise ValueError("未匹配到代码块，解析失败")
     
     # ---------------- 写入prompt代码 -------------------
     
@@ -147,16 +171,37 @@ for _, _mod, _ispkg in iter_modules(_pkg_path):
         # diy_prompt_dir = state.temp_data["prompt_dir"]
         diy_prompt_dir = state.request.cache_dir
         prompt_code = state.draft_prompt_code
+        class_name = None
+        # --- 策略1: 尝试通过 __all__ 获取类名 (增加 re.DOTALL 支持多行) ---
+        match = re.search(r'__all__\s*=\s*\[(.*?)\]', prompt_code, re.DOTALL)
+        if match:
+            try:
+                # 提取括号内的内容
+                content = match.group(1)
+                # 分割字符串，去除引号和空白
+                names = [n.strip().strip("'\"") for n in content.split(',')]
+                # 过滤空字符串
+                names = [n for n in names if n]
+                if names:
+                    class_name = names[0]
+            except Exception:
+                pass
         
-        # 尝试通过__all__获取类名
-        match = re.search(r'__all__\s*=\s*\[(.*?)\]', prompt_code)
-        if not match:
-            raise ValueError("未能从代码中提取到类名")
-        class_names = match.group(1).strip().split(",")
-        class_names = [name.strip() for name in class_names]
-        class_names = [name.strip("'") for name in class_names]
-        class_names = [name.strip('"') for name in class_names]
-        class_name = class_names[0]
+        # --- 策略2: 如果 __all__ 失败，尝试直接匹配 class 定义 ---
+        if not class_name:
+            # 匹配 class ClassName(BasePrompt): 或 class ClassName:
+            # 排除以 _ 开头的私有类
+            match_class = re.search(r'class\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(?', prompt_code)
+            if match_class:
+                class_name = match_class.group(1)
+                log.info(f"未找到 __all__，已回退并通过 class 定义提取到类名: {class_name}")
+
+        # --- 最终校验 ---
+        if not class_name:
+            log.error(f"无法提取类名，代码预览:\n{prompt_code[:200]}...")
+            # 给一个默认值防止阻断流程，但这通常意味着代码生成质量很差
+            class_name = "GeneratedPrompt" 
+            # 或者报错: raise ValueError("未能从代码中提取到类名")
         
         # 将类名转换为蛇形命名法
         snake_case_name = snake_case(class_name)
@@ -218,10 +263,14 @@ for _, _mod, _ispkg in iter_modules(_pkg_path):
         - DataFlow的算子负责对数据进行某种处理，以制造适用于大模型训练的优质数据。算子的工作过程是通过提示词来控制大模型进行处理数据。
         
         # 具体任务
-        - 根据以下提示词和算子代码，生成一组测试数据
-        算子代码：
+        - 阅读并分析给定的【算子代码】和【提示词代码】。
+        - 识别算子运行所需的输入参数。
+        - 生成一组符合业务场景、逻辑自洽的测试数据（JSONL格式）。
+        # 输入代码
+        【算子代码】：
         {operator_code}
-        提示词代码：
+        
+        【提示词代码】：
         {prompt_code}
         # 要求
         - 这组数据是用于测试提示词的，因此在内容上需要符合提示词的场景。
@@ -297,12 +346,13 @@ for _, _mod, _ispkg in iter_modules(_pkg_path):
         
         return import_lines
 
-    def _render_operator_blocks(self, op_name: str, state: PromptWritingState) -> str:
+    def _render_operator_blocks(self, op_name: str, state: PromptWritingState, columns: List[str] = None) -> str:
         op_cls = OPERATOR_REGISTRY.get(op_name)
         prompt_name = state.temp_data["prompt_class_name"]
         if op_cls is None:
             raise KeyError(f"Operator <{op_name}> not in OPERATOR_REGISTRY")
         init_kwargs, run_kwargs, run_has_storage = extract_op_params(op_cls)
+        valid_cols = columns if columns else ["input"]
         # Inject pipeline context where appropriate
         var_name = snake_case(op_cls.__name__)
         rendered_init_args: List[str] = []
@@ -321,7 +371,36 @@ for _, _mod, _ispkg in iter_modules(_pkg_path):
         run_args: List[str] = []
         if run_has_storage:
             run_args.append("storage=self.storage.step()")
-        run_args.extend([f"{k}={v}" for k, v in run_kwargs])
+        for k, v in run_kwargs:
+            # --- 策略 A: 固定输出列 ---
+            if k in ["output_key", "output_file"]:
+                run_args.append(f'{k}="test_result"')
+                continue
+
+            # --- 策略 B: 优先完全匹配 ---
+            # 如果参数名 k 直接存在于数据列中 (例如 input_context_key 在 columns 里)
+            if k in valid_cols:
+                run_args.append(f'{k}="{k}"')
+                continue
+
+            # --- 策略 C: 模糊匹配 (Fallback) ---
+            # 如果没有完全匹配，再尝试去猜 (比如 input_context_key 匹配 context)
+            if k.startswith("input_") and k.endswith("_key"):
+                guess_name = k.replace("input_", "").replace("_key", "")
+                match = next((col for col in valid_cols if guess_name in col), None)
+                if match:
+                    run_args.append(f'{k}="{match}"')
+                else:
+                    # 猜不到就保留默认值
+                    run_args.append(f"{k}={v}")
+                continue
+            
+            # 其他参数
+            run_args.append(f"{k}={v}")
+        # --- 修改结束 ---
+
+        # 原来的逻辑
+        # run_args.extend([f"{k}={v}" for k, v in run_kwargs])
 
         if run_args:
             forward_line = (
@@ -345,6 +424,7 @@ for _, _mod, _ispkg in iter_modules(_pkg_path):
         llm_local: bool = False,
         local_model_path: str = "",
         model_name: str = "gpt-4o",
+        columns: List[str] = None
     ) -> str:
         if cache_dir is None:
             cache_dir = (
@@ -374,7 +454,7 @@ for _, _mod, _ispkg in iter_modules(_pkg_path):
         import_lines = self._get_imports(state)
 
         # 3) 渲染 operator 代码片段（无缩进）
-        ops_init_block_raw, forward_block_raw = self._render_operator_blocks(op_name, state)
+        ops_init_block_raw, forward_block_raw = self._render_operator_blocks(op_name, state, columns=columns)
         
         import_section = "\n".join(import_lines)
 
@@ -511,8 +591,31 @@ if __name__ == "__main__":
         log.info("开始进行算子测试流程")
         cache_dir = self._init_cache_dir(state)
         test_data_file_path = await self._build_test_data_by_llm(state)
+        # --- [修改开始]：优化 input_key 推断逻辑 (改为列表) ---
+        valid_columns = ["question"]  # 默认兜底列表
+        try:
+            if test_data_file_path and os.path.exists(test_data_file_path):
+                with open(test_data_file_path, "r", encoding="utf-8") as f:
+                    line = f.readline()
+                    if line:
+                        import json
+                        d = json.loads(line)
+                        if d and isinstance(d, dict):
+                            keys = list(d.keys())
+                            # 过滤掉非输入字段
+                            candidates = [k for k in keys if k not in ["id", "golden_answer", "golden_result", "answer"]]
+                            
+                            if candidates:
+                                valid_columns = candidates  # 【关键】保留整个列表，不要只取 [0]
+                                log.info(f"从测试数据推断出可用列 (过滤后): {valid_columns}")
+                            elif keys:
+                                valid_columns = keys        # 兜底情况
+                                log.info(f"从测试数据推断出可用列 (无过滤): {valid_columns}")
+        except Exception as e:
+            log.warning(f"推断 valid_columns 失败: {e}")
+        # --- [修改结束] ---------------------------
         op_name = state.prompt_op_name
-        test_code = self._build_test_code(op_name, state, file_path=test_data_file_path, cache_dir=cache_dir)
+        test_code = self._build_test_code(op_name, state, file_path=test_data_file_path, cache_dir=cache_dir, columns=valid_columns)
         state.temp_data["prompt_test_code"] = test_code
         
         prompt_name = state.temp_data["prompt_class_name"]
@@ -601,8 +704,31 @@ if __name__ == "__main__":
         log.info("基于反馈改写后，开始进行算子测试流程")
         cache_dir = self._init_cache_dir(state)
         test_data_file_path = await self._build_test_data_by_llm(state)
+        # --- [修改开始]：优化 input_key 推断逻辑 (改为列表) ---
+        valid_columns = ["question"]  # 默认兜底列表
+        try:
+            if test_data_file_path and os.path.exists(test_data_file_path):
+                with open(test_data_file_path, "r", encoding="utf-8") as f:
+                    line = f.readline()
+                    if line:
+                        import json
+                        d = json.loads(line)
+                        if d and isinstance(d, dict):
+                            keys = list(d.keys())
+                            # 过滤掉非输入字段
+                            candidates = [k for k in keys if k not in ["id", "golden_answer", "golden_result", "answer"]]
+                            
+                            if candidates:
+                                valid_columns = candidates  # 【关键】保留整个列表，不要只取 [0]
+                                log.info(f"从测试数据推断出可用列 (过滤后): {valid_columns}")
+                            elif keys:
+                                valid_columns = keys        # 兜底情况
+                                log.info(f"从测试数据推断出可用列 (无过滤): {valid_columns}")
+        except Exception as e:
+            log.warning(f"推断 valid_columns 失败: {e}")
+        # --- [修改结束] ---------------------------
         op_name = state.prompt_op_name
-        test_code = self._build_test_code(op_name, state, file_path=test_data_file_path, cache_dir=cache_dir)
+        test_code = self._build_test_code(op_name, state, file_path=test_data_file_path, cache_dir=cache_dir, columns=valid_columns)
         state.temp_data["prompt_test_code"] = test_code
         
         prompt_name = state.temp_data["prompt_class_name"]
