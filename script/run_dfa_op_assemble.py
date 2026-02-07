@@ -53,7 +53,7 @@ PIPELINE_STEPS = [
         "op_name": "ReasoningAnswerGenerator",
         "params": {
             # __init__ 参数 (注意：在 wf_df_op_usage 中统一合并为 params)
-            "prompt_template": "dataflow.prompts.reasoning.math.MathAnswerGeneratorPrompt",
+            "prompt_template": "dataflow.prompts.reasoning.general.GeneralAnswerGeneratorPrompt",
             # run 参数
             "input_key": "raw_content",
             "output_key": "generated_cot"
