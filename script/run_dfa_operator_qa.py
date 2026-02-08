@@ -15,7 +15,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 # 添加项目路径
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -28,8 +28,8 @@ from dataflow_agent.logger import get_logger
 log = get_logger(__name__)
 
 # ===== Example config (edit here) =====
-INTERACTIVE = False
-QUERY = "我想过滤掉缺失值用哪个算子？"
+INTERACTIVE = True
+QUERY = "我想清洗数据，应该用哪个算子？"
 
 LANGUAGE = "zh"
 SESSION_ID = "demo_operator_qa"
@@ -40,7 +40,47 @@ CHAT_API_URL = os.getenv("DF_API_URL", "http://123.129.219.111:3000/v1/")
 API_KEY = os.getenv("DF_API_KEY", "")
 MODEL = os.getenv("DF_MODEL", "gpt-4o")
 
-OUTPUT_JSON = ""  # e.g. "cache_local/operator_qa_result.json"；空字符串表示不落盘
+OUTPUT_JSON = "cache_local/operator_qa_result.json"  # e.g. "cache_local/operator_qa_result.json"；空字符串表示不落盘
+
+
+# 自定义JSON编码器（处理消息对象）
+class MessageJSONEncoder(json.JSONEncoder):
+    """自定义JSON编码器，处理消息对象等不可序列化类型"""
+    def default(self, obj: Any) -> Any:
+        # 处理消息对象
+        if hasattr(obj, '__class__'):
+            obj_class_name = obj.__class__.__name__
+            # 匹配常见的消息对象类型
+            if obj_class_name in ["SystemMessage", "HumanMessage", "AIMessage", "ChatMessage"]:
+                return {
+                    "type": obj_class_name,
+                    "content": getattr(obj, "content", ""),
+                    "role": getattr(obj, "role", ""),
+                    "additional_kwargs": getattr(obj, "additional_kwargs", {}),
+                    "metadata": getattr(obj, "metadata", {})
+                }
+        # 处理其他可转换为字典的对象
+        if hasattr(obj, "model_dump"):
+            return obj.model_dump()
+        if hasattr(obj, "__dict__"):
+            return obj.__dict__
+        # 兜底：转为字符串
+        return str(obj)
+
+
+# 自定义消息对象转字典（单个/列表）
+def message_to_dict(msg: Any) -> Dict[str, Any]:
+    """将单个消息对象转换为可序列化的字典"""
+    if isinstance(msg, (dict, str, int, float, bool, type(None))):
+        return msg
+    # 使用自定义编码器转换
+    return MessageJSONEncoder().default(msg)
+
+def messages_to_list(messages: Any) -> List[Dict[str, Any]]:
+    """将消息列表转换为可序列化的字典列表"""
+    if not isinstance(messages, list):
+        return []
+    return [message_to_dict(msg) for msg in messages]
 
 
 def _safe_setattr(obj, key, value):
@@ -100,6 +140,10 @@ async def run_single_query(state: MainState, graph, query: str) -> Dict[str, Any
 
     results = agent_result.get("results", {})
 
+    # ========== 修改：处理messages，转换为可序列化的列表 ==========
+    raw_messages = final_state_dict.get("messages", [])
+    serializable_messages = messages_to_list(raw_messages)
+
     return {
         "success": True,
         "query": query,
@@ -107,9 +151,7 @@ async def run_single_query(state: MainState, graph, query: str) -> Dict[str, Any
         "related_operators": results.get("related_operators", []),
         "code_snippet": results.get("code_snippet", ""),
         "follow_up_suggestions": results.get("follow_up_suggestions", []),
-        # "chat_history": getattr(final_state, "chat_history", []),
-        "messages": final_state_dict.get("messages", []),
-
+        "messages": serializable_messages,  # 使用转换后的消息列表
     }
 
 async def interactive_mode(state: MainState, graph):
@@ -290,10 +332,13 @@ async def main():
         return
 
     result = await run_single_query(state, graph, QUERY)
+    
+    # 使用自定义编码器写入JSON ==========
     if OUTPUT_JSON:
         Path(OUTPUT_JSON).parent.mkdir(parents=True, exist_ok=True)
         with open(OUTPUT_JSON, "w", encoding="utf-8") as f:
-            json.dump(result, f, ensure_ascii=False, indent=2)
+            # 使用自定义编码器序列化
+            json.dump(result, f, ensure_ascii=False, indent=2, cls=MessageJSONEncoder)
         print(f"✅ 结果已保存到: {OUTPUT_JSON}")
     else:
         print(format_result(result))
