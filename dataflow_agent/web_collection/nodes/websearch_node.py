@@ -10,7 +10,6 @@ WebSearch Node
 5. 存储内容到 RAG
 6. 使用 SummaryAgent 从 RAG 内容生成下载子任务
 
-从老项目 loopai/agents/Obtainer/nodes/websearch_node.py 对齐实现。
 """
 
 import asyncio
@@ -367,7 +366,7 @@ async def _websearch_workflow(
                                     )
                                     logger.info(f"[Depth {depth}] URLSelector selected {len(selected_urls)} URLs from {len(new_candidate_urls)} candidates")
                                 except Exception as e:
-                                    logger.warning(f"[Depth {depth}] URL selection failed: {e}, falling back to first {topk_urls} URLs")
+                                    logger.debug(f"[Depth {depth}] URL selection failed: {e}, falling back to first {topk_urls} URLs")
                                     selected_urls = new_candidate_urls[:topk_urls]
                         
                         return {
@@ -377,7 +376,7 @@ async def _websearch_workflow(
                             "success": True
                         }
                     else:
-                        logger.warning(f"[Depth {depth}] URL {url} has insufficient content")
+                        logger.debug(f"[Depth {depth}] URL {url} has insufficient content (< 50 chars)")
                         return {
                             "url": url,
                             "depth": depth,
@@ -385,7 +384,7 @@ async def _websearch_workflow(
                             "success": False
                         }
                 except asyncio.TimeoutError:
-                    logger.warning(f"[Depth {depth}] Timeout exploring URL {url}")
+                    logger.debug(f"[Depth {depth}] Timeout exploring URL {url}")
                     return {
                         "url": url,
                         "depth": depth,

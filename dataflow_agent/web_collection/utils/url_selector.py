@@ -3,7 +3,7 @@ URL Selector
 ~~~~~~~~~~~~
 
 URL 智能筛选器，使用 LLM 从候选 URL 中选择最相关的 top-k 个。
-从老项目 loopai/agents/Obtainer/utils/url_selector.py 移植。
+
 """
 
 import json

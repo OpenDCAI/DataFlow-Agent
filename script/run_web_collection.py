@@ -47,6 +47,7 @@ async def run_workflow(
     max_depth: int = 2,
     max_download_subtasks: int = 5,
     debug: bool = False,
+    enable_webcrawler: bool = True,
 ) -> WebCollectionState:
     """
     运行 Web Collection 工作流
@@ -67,6 +68,7 @@ async def run_workflow(
         max_depth: 最大爬取深度
         max_download_subtasks: 最大下载子任务数
         debug: 是否启用调试模式
+        enable_webcrawler: 是否启用 WebCrawler (默认 True, 由 agent 根据用户输入自动评估; 使用 --no-webcrawler 可强制禁用)
         
     Returns:
         最终状态对象
@@ -108,6 +110,7 @@ async def run_workflow(
     print(f"  最大下载任务: {max_download_subtasks}")
     print(f"  Tavily API: {'已配置' if tavily_api_key else '未配置'}")
     print(f"  RAG: {'已配置' if rag_api_url and rag_api_key else '未配置'}")
+    print(f"  WebCrawler: {'启用 (将由 agent 自动评估)' if enable_webcrawler else '已禁用 (用户强制关闭)'}")
     print("=" * 60)
     
     # 创建请求
@@ -117,7 +120,7 @@ async def run_workflow(
         output_format=output_format,
         download_dir=download_dir,
         model=model,
-        DF_API_URL=DF_API_URL,
+        chat_api_url=DF_API_URL,
         api_key=api_key,
         tavily_api_key=tavily_api_key if tavily_api_key else None,
         rag_api_base_url=rag_api_url if rag_api_url else None,
@@ -127,6 +130,7 @@ async def run_workflow(
         max_depth=max_depth,
         max_download_subtasks=max_download_subtasks,
         debug=debug,
+        enable_webcrawler=enable_webcrawler,
     )
     
     # 创建初始状态
@@ -196,6 +200,12 @@ def main():
   python script/run_web_collection.py --target "收集机器学习问答数据集"
   python script/run_web_collection.py --target "收集代码生成数据集" --category SFT
   python script/run_web_collection.py --target "收集Python文档" --category PT --download-dir ./my_data
+  python script/run_web_collection.py --target "只下载HuggingFace数据集" --no-webcrawler
+
+注意:
+  WebCrawler 默认启用，agent 会根据 --target 的内容自动评估是否需要。
+  如果用户在 --target 中明确表示不需要爬虫，agent 会自动禁用 WebCrawler。
+  也可以使用 --no-webcrawler 强制禁用。
 
 环境变量:
   DF_API_URL   - LLM API URL (必需)
@@ -256,6 +266,12 @@ def main():
         action="store_true",
         help="启用调试模式"
     )
+    parser.add_argument(
+        "--no-webcrawler",
+        action="store_true",
+        default=False,
+        help="强制禁用 WebCrawler (默认由 agent 根据任务描述自动评估是否需要)"
+    )
     
     args = parser.parse_args()
     
@@ -270,6 +286,7 @@ def main():
         max_depth=args.max_depth,
         max_download_subtasks=args.max_tasks,
         debug=args.debug,
+        enable_webcrawler=not args.no_webcrawler,
     ))
 
 

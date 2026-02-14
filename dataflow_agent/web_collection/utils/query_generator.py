@@ -3,7 +3,7 @@ Query Generator
 ~~~~~~~~~~~~~~~
 
 搜索查询生成器，使用 LLM 生成多样化的搜索查询。
-从老项目 loopai/agents/Obtainer/utils/query_generator.py 移植。
+
 """
 
 import json

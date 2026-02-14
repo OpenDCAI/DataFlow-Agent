@@ -3,7 +3,7 @@ Data Convertor
 ~~~~~~~~~~~~~~
 
 数据格式转换器，用于将下载的数据集转换为中间格式（PT/SFT）。
-从老项目 loopai/agents/Constructor/utils/data_convertor.py 移植。
+
 
 主要功能：
 1. LLM 驱动的文件发现
@@ -579,6 +579,18 @@ class DataConvertor:
                     match_text = answer_text
 
                 annotation_result = json.loads(match_text)
+                
+                # Handle case where LLM returns a list instead of dict
+                if isinstance(annotation_result, list):
+                    if len(annotation_result) == 1 and isinstance(annotation_result[0], dict):
+                        annotation_result = annotation_result[0]
+                        logger.debug("Unwrapped single-element list to dict")
+                    else:
+                        raise ValueError(f"Expected dict but got list with {len(annotation_result)} elements")
+                
+                if not isinstance(annotation_result, dict):
+                    raise ValueError(f"Expected dict but got {type(annotation_result).__name__}")
+                
                 logger.debug(f"Data mapping result: {annotation_result}")
                 return annotation_result
                 
@@ -612,21 +624,70 @@ class DataConvertor:
 
 Your task is to identify field mappings for language model pretraining, including the main text content and metadata fields.
 
-Return a JSON object with:
-- "text": Field path or array of field paths for text content
-- "meta": Optional metadata field mappings (source, language, etc.)"""
+IMPORTANT: You MUST return a single JSON object (NOT an array/list). The response format must be:
+
+```json
+{
+  "text": "<field_name>",
+  "meta": {
+    "source": "<field_name_or_null>",
+    "language": "<field_name_or_null>"
+  }
+}
+```
+
+Field descriptions:
+- "text" (required): Field name or array of field names containing the main text content
+- "meta" (optional): Object with metadata field mappings (source, language, timestamp, etc.)"""
         else:  # SFT
             return """You are an expert in dataset classification and analysis.
 
 Your task is to identify field mappings for supervised fine-tuning, including conversation messages, system prompts, and metadata fields.
 
-Return a JSON object with:
-- "messages": Array of message specifications with role, content (field path), and loss_mask
-- "system": Optional system prompt field
-- "meta": Optional metadata field mappings"""
+IMPORTANT: You MUST return a single JSON object (NOT an array/list). The response format must be:
+
+```json
+{
+  "messages": [
+    {"role": "user", "content": "<field_name>", "loss_mask": false},
+    {"role": "assistant", "content": "<field_name>", "loss_mask": true}
+  ],
+  "system": "<field_name_or_null>",
+  "meta": {
+    "source": "<field_name_or_null>"
+  }
+}
+```
+
+Field descriptions:
+- "messages" (required): Array of message specifications, each with role, content (field path), and loss_mask
+- "system" (optional): Field name for system prompt, or null if not present
+- "meta" (optional): Object with metadata field mappings"""
 
     def _get_default_task_prompt(self, column_names: List[str], sample_rows_str: str, user_target: str, category: str) -> str:
         """Get default task prompt."""
+        category_name = 'pre-training' if category.upper() == 'PT' else 'supervised fine-tuning'
+        
+        if category.upper() == "PT":
+            example_output = '''{
+  "text": "content",
+  "meta": {
+    "source": "url",
+    "language": "lang"
+  }
+}'''
+        else:  # SFT
+            example_output = '''{
+  "messages": [
+    {"role": "user", "content": "instruction", "loss_mask": false},
+    {"role": "assistant", "content": "output", "loss_mask": true}
+  ],
+  "system": "system_prompt",
+  "meta": {
+    "source": "source"
+  }
+}'''
+        
         return f"""[User Requirements]
 User's original request: {user_target}
 
@@ -634,9 +695,20 @@ User's original request: {user_target}
 Dataset Columns: {column_names}
 Sample Data: {sample_rows_str}
 
-Please analyze the dataset and identify the field mappings for {'pre-training' if category.upper() == 'PT' else 'supervised fine-tuning'}.
+[Task]
+Analyze the dataset and identify the field mappings for {category_name}.
 
-Return a JSON object in ```json block."""
+[Output Requirements]
+- Return ONLY a single JSON object (NOT an array/list)
+- Use the exact field names from the dataset columns
+- Wrap the JSON in ```json and ``` markers
+
+Example output format:
+```json
+{example_output}
+```
+
+Now analyze the dataset and return the field mapping as a JSON object:"""
 
     async def invoke_file_discovery(self, file_list_str: str) -> List[str]:
         """Invoke LLM for file discovery."""

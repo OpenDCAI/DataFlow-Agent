@@ -22,10 +22,12 @@ Web数据收集工作流，用于：
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import asyncio
 import copy
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 
 from dataflow_agent.states.web_collection_state import WebCollectionState, WebCollectionRequest
 from dataflow_agent.graphbuilder.graph_builder import GenericGraphBuilder
@@ -48,6 +50,82 @@ from dataflow_agent.agentroles.data_agents.web_collection_agent import (
 from dataflow_agent.logger import get_logger
 
 log = get_logger(__name__)
+
+
+async def _evaluate_webcrawler_need(
+    user_query: str,
+    model_name: str,
+    base_url: str,
+    api_key: str,
+) -> Tuple[bool, str]:
+    """
+    使用 LLM 评估用户的任务描述是否需要启用 WebCrawler。
+
+    规则：
+    - 默认启用 WebCrawler
+    - 仅当用户在任务描述中明确表示不需要网页爬取时才禁用
+
+    Args:
+        user_query: 用户的任务描述
+        model_name: LLM 模型名称
+        base_url: LLM API URL
+        api_key: LLM API Key
+
+    Returns:
+        (enable, reason) 元组：是否启用以及理由
+    """
+    from langchain_openai import ChatOpenAI
+    from langchain_core.messages import SystemMessage, HumanMessage
+
+    llm = ChatOpenAI(
+        model=model_name,
+        base_url=base_url,
+        api_key=api_key,
+        temperature=0.0,
+        max_tokens=512,
+    )
+
+    system_prompt = """你是一个智能任务分析助手。你的任务是分析用户的数据收集需求描述，判断是否需要启用 WebCrawler（网页爬取器）。
+
+WebCrawler 的作用是从网页中爬取代码块和文本内容来生成训练数据，它会并行地搜索并爬取相关网页。
+
+判断规则：
+- 默认启用 WebCrawler（enable = true）
+- 仅当用户在描述中明确表示不需要网页爬取时才禁用（enable = false）
+- 禁用的典型表述包括但不限于："不需要爬虫"、"不要爬取网页"、"只下载数据集"、"禁用webcrawler"、"不需要webcrawler"、"关闭爬虫"、"无需网页爬取"
+- 如果用户描述中没有明确提到不需要爬虫/爬取，则保持启用
+
+请严格返回以下 JSON 格式（不要返回其他内容）：
+```json
+{"enable": true/false, "reason": "简短理由"}
+```"""
+
+    human_prompt = f"用户任务描述: {user_query}"
+
+    try:
+        response = await llm.ainvoke([
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=human_prompt),
+        ])
+
+        answer_text = response.content.strip()
+
+        # 解析 JSON
+        json_match = re.search(r'```json\s*([\s\S]*?)\s*```', answer_text)
+        if json_match:
+            json_str = json_match.group(1).strip()
+        else:
+            json_str = answer_text
+
+        result = json.loads(json_str)
+        enable = result.get("enable", True)
+        reason = result.get("reason", "")
+
+        return (bool(enable), str(reason))
+
+    except Exception as e:
+        log.warning(f"WebCrawler 评估调用失败，默认启用: {e}")
+        return (True, f"评估失败，默认启用: {e}")
 
 
 @register("web_collection")
@@ -91,7 +169,7 @@ def create_web_collection_graph() -> GenericGraphBuilder:
     
     async def start_node(state: WebCollectionState) -> WebCollectionState:
         """
-        开始节点: 初始化配置
+        开始节点: 初始化配置，并根据用户输入自动评估是否启用 WebCrawler
         """
         log.info("=== Web Collection Workflow: Starting ===")
         state.current_node = "start_node"
@@ -106,6 +184,30 @@ def create_web_collection_graph() -> GenericGraphBuilder:
         log.info(f"User query: {state.user_query}")
         log.info(f"Category: {state.request.category}")
         log.info(f"Download dir: {state.request.download_dir}")
+        
+        # === 自动评估是否需要启用 WebCrawler ===
+        # 仅在 enable_webcrawler 为默认值 True 且未被用户显式覆盖时进行 LLM 评估
+        # 如果用户通过 --no-webcrawler 显式设置为 False，则跳过评估
+        if state.request.enable_webcrawler and state.user_query:
+            try:
+                should_enable, reason = await _evaluate_webcrawler_need(
+                    user_query=state.user_query,
+                    model_name=state.request.model,
+                    base_url=state.request.chat_api_url,
+                    api_key=state.request.api_key,
+                )
+                state.request.enable_webcrawler = should_enable
+                log.info(
+                    f"WebCrawler 自动评估结果: {'启用' if should_enable else '禁用'}, "
+                    f"理由: {reason}"
+                )
+            except Exception as e:
+                log.warning(f"WebCrawler 自动评估失败，保持默认启用: {e}")
+        else:
+            if not state.request.enable_webcrawler:
+                log.info("WebCrawler 已被用户显式禁用，跳过自动评估")
+        
+        log.info(f"WebCrawler 状态: {'启用' if state.request.enable_webcrawler else '禁用'}")
         
         return state
     
@@ -407,14 +509,14 @@ def create_web_collection_graph() -> GenericGraphBuilder:
         # 后处理结果
         postprocess_results = state.postprocess_results
         if postprocess_results:
-            total_records = postprocess_results.get("total_records", 0)
+            total_records = postprocess_results.get("total_records_processed", 0)
             summary_parts.append(f"后处理: {total_records} 条记录")
         
         # 映射结果
         mapping_results = state.mapping_results
         if mapping_results:
-            total_mapped = mapping_results.get("total_mapped", 0)
-            output_path = mapping_results.get("output_path", "")
+            total_mapped = mapping_results.get("mapped_records", 0)
+            output_path = mapping_results.get("output_file", "")
             summary_parts.append(f"最终输出: {total_mapped} 条 {state.request.output_format} 格式记录")
             if output_path:
                 summary_parts.append(f"输出路径: {output_path}")

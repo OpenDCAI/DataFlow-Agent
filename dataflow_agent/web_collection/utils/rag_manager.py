@@ -23,29 +23,8 @@ from datetime import datetime
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import Chroma
 
-# Try to import RecursiveCharacterTextSplitter from new location first
-try:
-    from langchain_text_splitters import RecursiveCharacterTextSplitter
-except ImportError:
-    try:
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
-    except ImportError:
-        raise ImportError(
-            "Failed to import RecursiveCharacterTextSplitter. "
-            "Please install langchain-text-splitters: pip install langchain-text-splitters"
-        )
-
-# Try to import Document from new location first
-try:
-    from langchain_core.documents import Document
-except ImportError:
-    try:
-        from langchain.schema import Document
-    except ImportError:
-        raise ImportError(
-            "Failed to import Document. "
-            "Please install langchain-core: pip install langchain-core"
-        )
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
 
 from dataflow_agent.logger import get_logger
 
@@ -178,7 +157,7 @@ class RAGManager:
                     documents.append(Document(page_content=chunk, metadata=doc_metadata))
                 
                 if not documents:
-                    logger.warning(f"[RAG] No valid document chunks after cleaning/deduplication: {url}")
+                    logger.debug(f"[RAG] No valid document chunks after cleaning/deduplication: {url}")
                     return
                 
                 # Retry mechanism for ChromaDB operations

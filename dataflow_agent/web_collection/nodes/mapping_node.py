@@ -8,7 +8,6 @@ Mapping Node
 3. 批量处理所有数据
 4. 转换为 Alpaca 或自定义格式
 
-从老项目 loopai/agents/Constructor/mapping/llm_mapping_node.py 对齐实现。
 """
 
 import os
@@ -30,7 +29,7 @@ logger = get_logger(__name__)
 # Alpaca format schema
 ALPACA_SCHEMA = {
     "instruction": "string - Task instruction or question",
-    "input": "string - Optional input context",
+    "input": "string - Optional input context (e.g., system prompt, SQL schema, code context)",
     "output": "string - Expected response or answer"
 }
 
@@ -39,6 +38,80 @@ ALPACA_EXAMPLE = {
     "input": "",
     "output": "The capital of France is Paris."
 }
+
+# Few-shot examples for SFT data with system messages (e.g., text2sql)
+SFT_FEWSHOT_EXAMPLES = """
+## Few-shot Examples for SFT data mapping:
+
+### Example 1: Text2SQL with system message containing SQL schema
+Input:
+{
+  "messages": [
+    {"role": "system", "content": "CREATE TABLE farm (Id VARCHAR)"},
+    {"role": "user", "content": "How many farms are there?"},
+    {"role": "assistant", "content": "SELECT COUNT(*) FROM farm"}
+  ]
+}
+
+Expected Output:
+{
+  "instruction": "How many farms are there?",
+  "input": "CREATE TABLE farm (Id VARCHAR)",
+  "output": "SELECT COUNT(*) FROM farm"
+}
+
+### Example 2: Text2SQL with multiple tables in schema
+Input:
+{
+  "messages": [
+    {"role": "system", "content": "CREATE TABLE department (department_id VARCHAR, name VARCHAR); CREATE TABLE management (department_id VARCHAR, head_id VARCHAR)"},
+    {"role": "user", "content": "Which department has more than 1 head at a time?"},
+    {"role": "assistant", "content": "SELECT T1.department_id, T1.name, COUNT(*) FROM management AS T2 JOIN department AS T1 ON T1.department_id = T2.department_id GROUP BY T1.department_id HAVING COUNT(*) > 1"}
+  ]
+}
+
+Expected Output:
+{
+  "instruction": "Which department has more than 1 head at a time?",
+  "input": "CREATE TABLE department (department_id VARCHAR, name VARCHAR); CREATE TABLE management (department_id VARCHAR, head_id VARCHAR)",
+  "output": "SELECT T1.department_id, T1.name, COUNT(*) FROM management AS T2 JOIN department AS T1 ON T1.department_id = T2.department_id GROUP BY T1.department_id HAVING COUNT(*) > 1"
+}
+
+### Example 3: Code generation with system context
+Input:
+{
+  "messages": [
+    {"role": "system", "content": "You are a Python expert. Available libraries: pandas, numpy"},
+    {"role": "user", "content": "Write a function to calculate mean of a list"},
+    {"role": "assistant", "content": "def calculate_mean(numbers):\\n    return sum(numbers) / len(numbers)"}
+  ]
+}
+
+Expected Output:
+{
+  "instruction": "Write a function to calculate mean of a list",
+  "input": "You are a Python expert. Available libraries: pandas, numpy",
+  "output": "def calculate_mean(numbers):\\n    return sum(numbers) / len(numbers)"
+}
+
+### Example 4: QA without system message
+Input:
+{
+  "messages": [
+    {"role": "user", "content": "What is machine learning?"},
+    {"role": "assistant", "content": "Machine learning is a subset of AI that enables systems to learn from data."}
+  ]
+}
+
+Expected Output:
+{
+  "instruction": "What is machine learning?",
+  "input": "",
+  "output": "Machine learning is a subset of AI that enables systems to learn from data."
+}
+
+**Key Rule**: When the input has a "system" role message, its content should ALWAYS be placed in the "input" field of the Alpaca format. This is critical for tasks like text2sql where the schema information is essential context.
+"""
 
 
 async def mapping_node(state: WebCollectionState) -> WebCollectionState:
@@ -307,14 +380,14 @@ async def _generate_mapping_function_with_verification(
         mapping_functions.append(mapping_func)
     
     if len(mapping_functions) < 2:
-        logger.warning("Could not generate enough mapping functions for verification")
+        logger.debug("Could not generate enough mapping functions for verification, using single function")
         return mapping_functions[0] if mapping_functions else None
     
     # Verify consistency: test all functions on the same sample records
     logger.info("Verifying mapping function consistency...")
     
     if not _verify_mapping_functions(mapping_functions, sample_records):
-        logger.warning("Triple verification failed, using first successful function")
+        logger.debug("Triple verification failed, using first successful function")
         return mapping_functions[0]
     
     logger.info("Triple verification passed: mapping functions are consistent")
@@ -420,7 +493,14 @@ Your task is: Based on sample input data and target format definition, write a P
 
 **Input Format (Intermediate)**:
 - PT mode: {"text": "string | array<string>", "meta": {...}}
-- SFT mode: {"messages": [{"role": "...", "content": "..."}], "system": "...", "meta": {...}}
+- SFT mode: {"messages": [{"role": "...", "content": "..."}], "meta": {...}}
+  - Messages may contain: system (context/schema), user (question/instruction), assistant (answer/output)
+
+**CRITICAL MAPPING RULES for SFT data**:
+- The "system" role message content should be mapped to the "input" field
+- The "user" role message content should be mapped to the "instruction" field
+- The "assistant" role message content should be mapped to the "output" field
+- This is especially important for text2sql data where system contains SQL schema (CREATE TABLE statements)
 
 **Requirements**:
 1. Function name must be `map_record`
@@ -448,13 +528,16 @@ def _build_default_task_prompt(samples_text: str, target_schema: Dict, target_ex
 [Category]
 {category}
 
+{SFT_FEWSHOT_EXAMPLES}
+
 Please write a Python mapping function `map_record(record: dict) -> dict` that converts the input data to the target format.
 
-Requirements:
+**CRITICAL Requirements**:
 1. Function name must be `map_record`
 2. Handle edge cases (null values, missing fields, type conversions)
 3. If content or text is a list, merge into string (use newline separator)
-4. Only output function code, no explanations
+4. **IMPORTANT**: For SFT data with messages, the "system" role content MUST be placed in the "input" field (e.g., SQL schema for text2sql tasks)
+5. Only output function code, no explanations
 
 Only output the Python function code."""
 
@@ -502,7 +585,7 @@ def _verify_mapping_functions(
         
         # Compare all results
         if len(set(json.dumps(r, sort_keys=True) for r in results)) != 1:
-            logger.warning(f"Sample {record_idx + 1} produced inconsistent results")
+            logger.debug(f"Sample {record_idx + 1} produced inconsistent results across mapping functions")
             return False
     
     return True
@@ -542,11 +625,15 @@ def _fallback_map_to_alpaca(record: Dict[str, Any], category: str) -> Optional[D
         messages = record.get("messages", [])
         if messages:
             instruction = ""
+            input_text = ""
             output_text = ""
             for msg in messages:
                 role = msg.get("role", "")
                 content = msg.get("content", "")
-                if role == "user":
+                if role == "system":
+                    # System message (e.g., SQL schema) goes to input field
+                    input_text = content
+                elif role == "user":
                     instruction = content
                 elif role == "assistant":
                     output_text = content
@@ -554,13 +641,13 @@ def _fallback_map_to_alpaca(record: Dict[str, Any], category: str) -> Optional[D
             if instruction or output_text:
                 return {
                     "instruction": str(instruction).strip(),
-                    "input": "",
+                    "input": str(input_text).strip(),
                     "output": str(output_text).strip(),
                 }
         
         # Try legacy format
         instruction = record.get("instruction") or record.get("prompt") or record.get("question") or ""
-        input_text = record.get("input") or record.get("context") or ""
+        input_text = record.get("input") or record.get("context") or record.get("system") or ""
         output_text = record.get("output") or record.get("response") or record.get("answer") or ""
         
         if instruction or output_text:

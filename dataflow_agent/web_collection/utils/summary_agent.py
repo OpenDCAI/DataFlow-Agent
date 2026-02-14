@@ -3,7 +3,7 @@ Summary Agent
 ~~~~~~~~~~~~~
 
 摘要代理，从 RAG 内容生成下载子任务。
-从老项目 loopai/agents/Obtainer/utils/summary_agent.py 移植。
+
 """
 
 import json

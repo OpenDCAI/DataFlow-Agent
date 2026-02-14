@@ -3,7 +3,7 @@ WebCrawler Dataset Generator
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 从网页内容生成 SFT/PT 格式数据集的工具。
-适配自 loopai/agents/WebCrawler/utils/dataset_generator.py
+
 """
 
 import json

@@ -7,7 +7,7 @@ Web Tools
 - DuckDuckGo 搜索
 - Jina Reader 网页爬取
 
-从老项目 loopai/agents/Obtainer/utils/web_tools.py 移植。
+
 """
 
 import os

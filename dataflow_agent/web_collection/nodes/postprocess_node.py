@@ -9,7 +9,7 @@ Postprocess Node
 4. 数据格式转换到中间格式
 5. [新增] 合并 WebCrawler 生成的数据集
 
-从老项目 loopai/agents/Constructor/nodes/postprocess_node.py 对齐实现。
+
 """
 
 import asyncio
