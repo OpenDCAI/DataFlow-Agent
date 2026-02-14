@@ -3,15 +3,13 @@ import asyncio
 import logging
 from typing import Optional
 import gradio as gr
-from langgraph.graph import StateGraph, START, END
 
-from dataflow_agent.state import DataCollectionRequest, DataCollectionState
-from dataflow_agent.agentroles.data_agents.dataconvertor import universal_data_conversion
-from script.run_dfa_web_collection import web_crawl_collection
+from dataflow_agent.states.web_collection_state import WebCollectionState, WebCollectionRequest
+from dataflow_agent.workflow.wf_web_collection import create_web_collection_graph
 
 
 def create_web_collection():
-    """子页面：网页数据采集与转换（基于 run_web_pipeline 工作流）"""
+    """子页面：网页数据采集与转换（基于 Web Collection 工作流）"""
     with gr.Blocks() as page:
         gr.Markdown("# 🌐 网页数据采集与转换")
 
@@ -29,41 +27,22 @@ def create_web_collection():
                     choices=["PT", "SFT"],
                     value="SFT"
                 )
-                dataset_num_limit = gr.Slider(
-                    label="数据集数量上限（每关键词，仅用于参考）",
-                    minimum=1,
-                    maximum=50,
-                    step=1,
-                    value=5
-                )
-                dataset_size_category = gr.Dropdown(
-                    label="数据集大小范围",
-                    choices=["n<1K", "1K<n<10K", "10K<n<100K", "100K<n<1M", "n>1M"],
-                    value="1K<n<10K"
+                output_format = gr.Dropdown(
+                    label="输出格式",
+                    choices=["alpaca", "sharegpt"],
+                    value="alpaca",
+                    info="目标输出数据格式"
                 )
                 max_download_subtasks = gr.Number(
                     label="下载子任务上限",
-                    value=None,
+                    value=5,
                     precision=0,
-                    minimum=0,
-                    info="限制最终执行的下载子任务数量，留空表示不限制"
+                    minimum=1,
+                    info="每个子任务最多下载子任务数"
                 )
-                with gr.Row():
-                    max_dataset_size_value = gr.Number(
-                        label="最大数据集大小",
-                        value=None,
-                        precision=0,
-                        minimum=0,
-                        info="可留空；输入数值后选择单位"
-                    )
-                    max_dataset_size_unit = gr.Dropdown(
-                        label="单位",
-                        choices=["B", "KB", "MB", "GB", "TB"],
-                        value="GB"
-                    )
                 download_dir = gr.Textbox(
                     label="下载目录",
-                    value="downloaded_data",
+                    value="./web_collection_output",
                 )
                 language = gr.Dropdown(
                     label="提示词语言",
@@ -73,17 +52,17 @@ def create_web_collection():
 
                 gr.Markdown("### LLM 配置")
                 chat_api_url = gr.Textbox(
-                    label="CHAT_API_URL",
-                    value=os.getenv("CHAT_API_URL", "http://123.129.219.111:3000/v1/chat/completions")
+                    label="DF_API_URL",
+                    value=os.getenv("DF_API_URL", "")
                 )
                 api_key = gr.Textbox(
-                    label="CHAT_API_KEY",
-                    value=os.getenv("CHAT_API_KEY", ""),
+                    label="DF_API_KEY",
+                    value=os.getenv("DF_API_KEY", ""),
                     type="password"
                 )
                 model = gr.Textbox(
                     label="CHAT_MODEL",
-                    value=os.getenv("CHAT_MODEL", "deepseek-chat")
+                    value=os.getenv("CHAT_MODEL", "gpt-4o")
                 )
 
                 gr.Markdown("### 其他环境配置")
@@ -107,13 +86,13 @@ def create_web_collection():
                 )
 
                 gr.Markdown("### RAG 配置")
-                rag_ebd_model = gr.Textbox(
-                    label="RAG_EBD_MODEL",
-                    value=os.getenv("RAG_EBD_MODEL", "text-embedding-3-large")
+                rag_embed_model = gr.Textbox(
+                    label="RAG_EMB_MODEL",
+                    value=os.getenv("RAG_EMB_MODEL", "text-embedding-3-large")
                 )
                 rag_api_url = gr.Textbox(
                     label="RAG_API_URL",
-                    value=os.getenv("RAG_API_URL", "http://123.129.219.111:3000/v1/chat/completions")
+                    value=os.getenv("RAG_API_URL", "")
                 )
                 rag_api_key = gr.Textbox(
                     label="RAG_API_KEY",
@@ -123,46 +102,53 @@ def create_web_collection():
 
                 # 高级配置区域（可折叠）
                 with gr.Accordion("⚙️ 高级配置", open=False):
-                    gr.Markdown("### 网页采集高级配置")
-                    max_crawl_cycles_per_task = gr.Slider(
-                        label="下载任务最大循环次数",
+                    gr.Markdown("### 搜索与爬取配置")
+                    search_engine = gr.Dropdown(
+                        label="搜索引擎",
+                        choices=["tavily", "google", "bing", "duckduckgo"],
+                        value="tavily",
+                        info="选择用于搜索的引擎"
+                    )
+                    max_urls = gr.Slider(
+                        label="最大 URL 数量",
                         minimum=1,
                         maximum=50,
                         step=1,
                         value=10,
-                        info="控制每个下载任务的最大重试循环次数"
+                        info="单次搜索最大处理URL数量"
                     )
-                    max_crawl_cycles_for_research = gr.Slider(
-                        label="研究阶段最大循环次数",
+                    max_depth = gr.Slider(
+                        label="最大爬取深度",
                         minimum=1,
-                        maximum=50,
+                        maximum=10,
                         step=1,
-                        value=15,
-                        info="research阶段的最大循环次数，允许访问更多网站"
-                    )
-                    search_engine = gr.Dropdown(
-                        label="搜索引擎",
-                        choices=["tavily", "duckduckgo", "jina"],
-                        value="tavily",
-                        info="选择用于搜索的引擎"
-                    )
-                    use_jina_reader = gr.Checkbox(
-                        label="使用 Jina Reader",
-                        value=True,
-                        info="是否使用 Jina Reader 提取网页结构化内容（Markdown格式，快速）"
+                        value=2,
+                        info="爬取最大深度"
                     )
                     enable_rag = gr.Checkbox(
                         label="启用 RAG 增强",
                         value=True,
-                        info="是否启用 RAG 增强（无论使用哪种解析方法，都用 RAG 精炼内容）"
+                        info="是否启用 RAG 增强"
                     )
                     concurrent_pages = gr.Slider(
-                        label="并行处理页面数",
+                        label="WebCrawler 并发爬取数",
                         minimum=1,
                         maximum=20,
                         step=1,
-                        value=5,
-                        info="并行处理的页面数量，可根据网络和机器性能调整（建议3-10）"
+                        value=3,
+                        info="WebCrawler 并行处理的页面数量"
+                    )
+
+                    gr.Markdown("### WebCrawler 配置")
+                    enable_webcrawler = gr.Checkbox(
+                        label="启用 WebCrawler",
+                        value=True,
+                        info="是否启用 WebCrawler 并行爬取（默认启用，agent 会根据任务描述自动评估）"
+                    )
+                    debug = gr.Checkbox(
+                        label="调试模式",
+                        value=False,
+                        info="启用调试模式，输出更详细的日志"
                     )
                     disable_cache = gr.Checkbox(
                         label="禁用缓存",
@@ -174,40 +160,6 @@ def create_web_collection():
                         value="",
                         placeholder="留空则使用默认临时目录",
                         info="自定义临时目录路径，用于缓存和临时文件"
-                    )
-
-                    gr.Markdown("### 数据转换高级配置")
-                    conversion_temperature = gr.Slider(
-                        label="转换模型温度",
-                        minimum=0.0,
-                        maximum=2.0,
-                        step=0.1,
-                        value=0.0,
-                        info="数据转换时使用的模型温度参数"
-                    )
-                    conversion_max_tokens = gr.Slider(
-                        label="转换最大 Token 数",
-                        minimum=512,
-                        maximum=8192,
-                        step=256,
-                        value=4096,
-                        info="数据转换时的最大 token 数"
-                    )
-                    conversion_max_sample_length = gr.Slider(
-                        label="最大采样长度（字符）",
-                        minimum=50,
-                        maximum=1000,
-                        step=50,
-                        value=200,
-                        info="每个字段的最大采样长度（字符数）"
-                    )
-                    conversion_num_sample_records = gr.Slider(
-                        label="采样记录数量",
-                        minimum=1,
-                        maximum=10,
-                        step=1,
-                        value=3,
-                        info="用于分析的采样记录数量"
                     )
 
                 submit_btn = gr.Button("开始网页采集与转换", variant="primary")
@@ -222,11 +174,8 @@ def create_web_collection():
         async def run_pipeline(
             target_text: str,
             category_val: str,
-            dataset_num_limit_val: int,
-            dataset_size_category_val: str,
+            output_format_val: str,
             max_download_subtasks_val: float | None,
-            max_dataset_size_value_val: float | None,
-            max_dataset_size_unit_val: str,
             download_dir_val: str,
             language_val: str,
             chat_api_url_val: str,
@@ -235,32 +184,29 @@ def create_web_collection():
             hf_endpoint_val: str,
             kaggle_username_val: str,
             kaggle_key_val: str,
-            rag_ebd_model_val: str,
+            tavily_api_key_val: str,
+            rag_embed_model_val: str,
             rag_api_url_val: str,
             rag_api_key_val: str,
-            tavily_api_key_val: str,
             # 高级配置参数
-            max_crawl_cycles_per_task_val: int,
-            max_crawl_cycles_for_research_val: int,
             search_engine_val: str,
-            use_jina_reader_val: bool,
+            max_urls_val: int,
+            max_depth_val: int,
             enable_rag_val: bool,
             concurrent_pages_val: int,
+            enable_webcrawler_val: bool,
+            debug_val: bool,
             disable_cache_val: bool,
             temp_base_dir_val: str,
-            conversion_temperature_val: float,
-            conversion_max_tokens_val: int,
-            conversion_max_sample_length_val: int,
-            conversion_num_sample_records_val: int,
         ):
             # 注入/覆盖运行所需的环境变量
-            os.environ["CHAT_API_URL"] = chat_api_url_val or ""
-            os.environ["CHAT_API_KEY"] = api_key_val or ""
+            os.environ["DF_API_URL"] = chat_api_url_val or ""
+            os.environ["DF_API_KEY"] = api_key_val or ""
             os.environ["CHAT_MODEL"] = model_val or ""
             os.environ["HF_ENDPOINT"] = hf_endpoint_val or ""
             os.environ["KAGGLE_USERNAME"] = kaggle_username_val or ""
             os.environ["KAGGLE_KEY"] = kaggle_key_val or ""
-            os.environ["RAG_EBD_MODEL"] = rag_ebd_model_val or ""
+            os.environ["RAG_EMB_MODEL"] = rag_embed_model_val or ""
             os.environ["RAG_API_URL"] = rag_api_url_val or ""
             os.environ["RAG_API_KEY"] = rag_api_key_val or ""
             if tavily_api_key_val:
@@ -279,115 +225,73 @@ def create_web_collection():
             else:
                 os.environ.pop("DF_TEMP_DIR", None)
 
-            # 组装请求
-            def _convert_size_to_bytes(value: float | None, unit: str) -> Optional[int]:
-                if value is None:
-                    return None
+            # 规范化下载子任务上限
+            max_download_subtasks_int: Optional[int] = None
+            if max_download_subtasks_val is not None:
                 try:
-                    numeric = float(value)
+                    numeric = int(max_download_subtasks_val)
+                    if numeric > 0:
+                        max_download_subtasks_int = numeric
                 except (TypeError, ValueError):
-                    return None
-                if numeric <= 0:
-                    return None
-                unit = (unit or "B").upper()
-                multipliers = {
-                    "B": 1,
-                    "KB": 1024,
-                    "MB": 1024 ** 2,
-                    "GB": 1024 ** 3,
-                    "TB": 1024 ** 4,
-                }
-                multiplier = multipliers.get(unit, 1)
-                return int(numeric * multiplier)
+                    pass
 
-            max_dataset_size_bytes = _convert_size_to_bytes(max_dataset_size_value_val, max_dataset_size_unit_val)
-
-            def _normalize_download_limit(value: float | None) -> Optional[int]:
-                if value is None:
-                    return None
-                try:
-                    numeric = int(value)
-                except (TypeError, ValueError):
-                    return None
-                if numeric <= 0:
-                    return None
-                return numeric
-
-            max_download_subtasks_int = _normalize_download_limit(max_download_subtasks_val)
-
-            req = DataCollectionRequest(
+            # 组装 WebCollectionRequest
+            request = WebCollectionRequest(
                 target=target_text,
                 category=category_val,
-                dataset_num_limit=int(dataset_num_limit_val),
-                dataset_size_category=dataset_size_category_val,
-                max_dataset_size=max_dataset_size_bytes,
-                max_download_subtasks=max_download_subtasks_int,
+                output_format=output_format_val,
                 download_dir=download_dir_val,
+                language=language_val,
                 chat_api_url=chat_api_url_val,
                 api_key=api_key_val,
                 model=model_val,
-                language=language_val,
+                # 搜索配置
+                search_engine=search_engine_val,
+                max_urls=int(max_urls_val),
+                max_depth=int(max_depth_val),
+                max_download_subtasks=max_download_subtasks_int,
+                # RAG 配置
+                enable_rag=enable_rag_val,
+                rag_embed_model=rag_embed_model_val or "",
+                rag_api_base_url=rag_api_url_val or None,
+                rag_api_key=rag_api_key_val or None,
+                # 外部 API Keys
                 tavily_api_key=tavily_api_key_val or None,
+                kaggle_username=kaggle_username_val or None,
+                kaggle_key=kaggle_key_val or None,
+                # WebCrawler 配置
+                enable_webcrawler=enable_webcrawler_val,
+                webcrawler_concurrent_pages=int(concurrent_pages_val),
+                # 处理配置
+                debug=debug_val,
             )
 
-            # 构建工作流
-            state = DataCollectionState(request=req)
+            # 构建初始状态
+            state = WebCollectionState(request=request)
 
-            # 创建包装函数以传递高级配置参数
-            async def web_crawl_collection_wrapper(state: DataCollectionState) -> DataCollectionState:
-                return await web_crawl_collection(
-                    state,
-                    max_crawl_cycles_per_task=int(max_crawl_cycles_per_task_val),
-                    max_crawl_cycles_for_research=int(max_crawl_cycles_for_research_val),
-                    search_engine=search_engine_val,
-                    use_jina_reader=use_jina_reader_val,
-                    enable_rag=enable_rag_val,
-                    concurrent_pages=int(concurrent_pages_val),
-                    disable_cache=bool(disable_cache_val),
-                    temp_base_dir=(temp_base_dir_val.strip() or None) if isinstance(temp_base_dir_val, str) else None,
-                    max_download_subtasks=max_download_subtasks_int,
-                )
-
-            async def universal_data_conversion_wrapper(state: DataCollectionState) -> DataCollectionState:
-                return await universal_data_conversion(
-                    state,
-                    model_name=model_val or None,
-                    temperature=float(conversion_temperature_val),
-                    max_tokens=int(conversion_max_tokens_val),
-                    max_sample_length=int(conversion_max_sample_length_val),
-                    num_sample_records=int(conversion_num_sample_records_val),
-                )
-
-            graph_builder = StateGraph(DataCollectionState)
-            graph_builder.add_node("web_crawl_collection", web_crawl_collection_wrapper)
-            graph_builder.add_node("universal_data_conversion", universal_data_conversion_wrapper)
-            graph_builder.add_edge(START, "web_crawl_collection")
-            graph_builder.add_edge("web_crawl_collection", "universal_data_conversion")
-            graph_builder.add_edge("universal_data_conversion", END)
-            graph = graph_builder.compile()
+            # 使用新版工作流图
+            builder = create_web_collection_graph()
+            graph = builder.build()
 
             header_lines = [
                 "=" * 60,
-                "开始执行网页采集与转换工作流",
+                "开始执行 Web Collection 工作流",
                 "=" * 60,
-                f"目标: {req.target}",
-                f"类别: {req.category}",
-                f"下载目录: {req.download_dir}",
-                "\n【网页采集配置】",
+                f"目标: {request.target}",
+                f"类别: {request.category}",
+                f"输出格式: {request.output_format}",
+                f"下载目录: {request.download_dir}",
+                "\n【搜索与爬取配置】",
                 f"  - 搜索引擎: {search_engine_val}",
-                f"  - 下载子任务上限: {max_download_subtasks_int if max_download_subtasks_int is not None else '不限制'}",
-                f"  - 任务最大循环次数: {max_crawl_cycles_per_task_val}",
-                f"  - 研究阶段最大循环次数: {max_crawl_cycles_for_research_val}",
-                f"  - 使用 Jina Reader: {'是' if use_jina_reader_val else '否'}",
+                f"  - 最大 URL 数: {max_urls_val}",
+                f"  - 最大爬取深度: {max_depth_val}",
+                f"  - 下载子任务上限: {max_download_subtasks_int if max_download_subtasks_int is not None else '默认(5)'}",
                 f"  - 启用 RAG: {'是' if enable_rag_val else '否'}",
-                f"  - 并行页面数: {concurrent_pages_val}",
+                "\n【WebCrawler 配置】",
+                f"  - 启用 WebCrawler: {'是' if enable_webcrawler_val else '否'}",
+                f"  - 并发爬取数: {concurrent_pages_val}",
+                f"  - 调试模式: {'是' if debug_val else '否'}",
                 f"  - 禁用缓存: {'是' if disable_cache_val else '否'}",
-                "\n【数据转换配置】",
-                f"  - 模型温度: {conversion_temperature_val}",
-                f"  - 最大 Token 数: {conversion_max_tokens_val}",
-                f"  - 最大采样长度: {conversion_max_sample_length_val}",
-                f"  - 采样记录数: {conversion_num_sample_records_val}",
-                f"\n数据集大小限制: {max_dataset_size_bytes if max_dataset_size_bytes else '不限制'}",
                 "=" * 60,
             ]
 
@@ -445,7 +349,7 @@ def create_web_collection():
             # 初始输出
             yield "\n".join(log_lines), gr.update(value=None)
 
-            async def run_workflow() -> DataCollectionState:
+            async def run_workflow():
                 return await graph.ainvoke(state)
 
             workflow_task = asyncio.create_task(run_workflow())
@@ -461,7 +365,7 @@ def create_web_collection():
                         if workflow_task.done():
                             break
 
-                await workflow_task
+                final_state = await workflow_task
 
                 # 清空剩余日志
                 while True:
@@ -473,17 +377,53 @@ def create_web_collection():
 
                 log_lines.append("流程执行完成！")
 
+                # 从最终状态提取结果（兼容 dict 和 WebCollectionState 对象）
+                if isinstance(final_state, dict):
+                    exception = final_state.get("exception", "")
+                    mapping_results = final_state.get("mapping_results", {})
+                    download_results = final_state.get("download_results", {})
+                    webcrawler_summary = final_state.get("webcrawler_summary", "")
+                    webcrawler_sft_jsonl_path = final_state.get("webcrawler_sft_jsonl_path", "")
+                    webcrawler_pt_jsonl_path = final_state.get("webcrawler_pt_jsonl_path", "")
+                else:
+                    exception = getattr(final_state, "exception", "")
+                    mapping_results = getattr(final_state, "mapping_results", {})
+                    download_results = getattr(final_state, "download_results", {})
+                    webcrawler_summary = getattr(final_state, "webcrawler_summary", "")
+                    webcrawler_sft_jsonl_path = getattr(final_state, "webcrawler_sft_jsonl_path", "")
+                    webcrawler_pt_jsonl_path = getattr(final_state, "webcrawler_pt_jsonl_path", "")
+
+                if exception:
+                    log_lines.append(f"警告: 执行过程中出现异常: {exception}")
+
                 result_payload = {
-                    "download_dir": req.download_dir,
-                    "processed_output": os.path.join(req.download_dir, "processed_output"),
-                    "category": req.category,
-                    "language": req.language,
-                    "chat_model": req.model,
-                    "max_download_subtasks": req.max_download_subtasks,
-                    "max_dataset_size_bytes": req.max_dataset_size,
-                    "max_dataset_size_unit": max_dataset_size_unit_val if req.max_dataset_size else None,
-                    "max_dataset_size_value": max_dataset_size_value_val if req.max_dataset_size else None,
+                    "download_dir": request.download_dir,
+                    "category": request.category,
+                    "output_format": request.output_format,
+                    "language": request.language,
+                    "chat_model": request.model,
+                    "max_download_subtasks": request.max_download_subtasks,
+                    "enable_webcrawler": request.enable_webcrawler,
                 }
+
+                if download_results:
+                    completed = download_results.get("completed", 0)
+                    failed = download_results.get("failed", 0)
+                    total = download_results.get("total", 0)
+                    result_payload["download_stats"] = f"{completed}/{total} 成功, {failed} 失败"
+
+                if mapping_results:
+                    output_path = mapping_results.get("output_file", "") or mapping_results.get("output_path", "")
+                    total_mapped = mapping_results.get("mapped_records", 0) or mapping_results.get("total_mapped", 0)
+                    result_payload["mapping_output_file"] = output_path
+                    result_payload["mapping_total_records"] = total_mapped
+
+                if webcrawler_sft_jsonl_path:
+                    result_payload["webcrawler_sft_jsonl"] = webcrawler_sft_jsonl_path
+                if webcrawler_pt_jsonl_path:
+                    result_payload["webcrawler_pt_jsonl"] = webcrawler_pt_jsonl_path
+                if webcrawler_summary:
+                    result_payload["webcrawler_summary"] = webcrawler_summary
 
                 yield "\n".join(log_lines), result_payload
 
@@ -510,11 +450,8 @@ def create_web_collection():
             inputs=[
                 target,
                 category,
-                dataset_num_limit,
-                dataset_size_category,
+                output_format,
                 max_download_subtasks,
-                max_dataset_size_value,
-                max_dataset_size_unit,
                 download_dir,
                 language,
                 chat_api_url,
@@ -523,27 +460,22 @@ def create_web_collection():
                 hf_endpoint,
                 kaggle_username,
                 kaggle_key,
-                rag_ebd_model,
+                tavily_api_key,
+                rag_embed_model,
                 rag_api_url,
                 rag_api_key,
-                tavily_api_key,
                 # 高级配置参数
-                max_crawl_cycles_per_task,
-                max_crawl_cycles_for_research,
                 search_engine,
-                use_jina_reader,
+                max_urls,
+                max_depth,
                 enable_rag,
                 concurrent_pages,
+                enable_webcrawler,
+                debug,
                 disable_cache,
                 temp_base_dir,
-                conversion_temperature,
-                conversion_max_tokens,
-                conversion_max_sample_length,
-                conversion_num_sample_records,
             ],
             outputs=[output_log, output_json],
         )
 
     return page
-
-
