@@ -49,6 +49,13 @@ data = [
 ]
 
 
+web = [
+    "playwright>=1.40.0",
+    "playwright-stealth>=1.0.6",
+    "httpx>=0.25.0",
+]
+
+
 [tool.setuptools.package-dir]
 # 告诉 setuptools 源码包目录
 "" = "."
