@@ -85,4 +85,4 @@ trajectory 中记录的 messages 为准。Task/summary 标识不匹配时显示�
 - **报告含完整提示词、模型输出与图片，分享前仍需检查敏感信息。** 这不是自动脱敏工具，
   导出器不会删除本来就在消息里的敏感内容。不要仅凭报告终止状态判断任务正确。
 
-HTML/CSS/JS 随 wheel 打包。测试：`python -m pytest tests/test_trajectory_html.py -q`。
+HTML/CSS/JS 与本说明随 wheel 打包。

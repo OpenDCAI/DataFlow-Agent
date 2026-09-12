@@ -356,7 +356,7 @@ interpreter or dependency boundary.
 
 ## Further reading
 
-- [Offline trajectory HTML reports](docs/trajectory-html.md)
+- [Offline trajectory HTML reports](dataflow_mm_agent/visualization/README.md)
 - [Create an Env or MCP adapter](dataflow_mm_agent/skills/create-env/SKILL.md)
 - [Env contracts and package layout](dataflow_mm_agent/skills/create-env/references/contracts-and-layout.md)
 - [Task generation](dataflow_mm_agent/skills/create-env/references/task-generation.md)

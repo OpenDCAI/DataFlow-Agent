@@ -37,6 +37,7 @@ dataflow_mm_agent = [
     "skills/*/agents/*.yaml",
     "skills/*/references/*.md",
     "skills/*/scripts/*.py",
+    "visualization/README.md",
     "visualization/assets/*.html",
     "visualization/assets/*.css",
     "visualization/assets/*.js",
