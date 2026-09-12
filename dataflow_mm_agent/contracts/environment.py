@@ -118,9 +118,12 @@ class Env(Protocol):
 
     Implementations may additionally expose ``start(init, workspace)`` and
     ``close()``.  The runtime discovers those hooks with ``getattr``.
+    Rollout and replay complete optional startup before reading ``tools()``;
+    the resulting catalog is fixed for the episode.
     """
 
     def tools(self) -> Sequence[ToolSpec]:
+        """Return the episode catalog; may require successful optional startup."""
         ...
 
     def call(self, tool_name: str, args: Mapping[str, Any]) -> ToolResult:
@@ -244,7 +247,7 @@ def start_env(
     init: Mapping[str, Any] | None,
     workspace: Path,
 ) -> ToolResult | None:
-    """Invoke the optional episode-start hook."""
+    """Invoke optional startup before callers discover the episode's tools."""
 
     start = getattr(env, "start", None)
     if start is None:

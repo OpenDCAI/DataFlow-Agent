@@ -48,6 +48,11 @@ snapshots remain optional implementation capabilities; `snapshot()` and
 `verify_task(binding, rollout)` follow the signatures documented in
 [references/contracts-and-layout.md](references/contracts-and-layout.md).
 
+Rollout and replay complete optional `start` before reading `tools()`, then
+retain that catalog for the episode. A session-based MCP can connect in
+`start` and discover tools on the same session; do not require a pre-generated
+catalog or a separate discovery session for this ordering.
+
 `EnvironmentSpec` is solver-facing registration metadata, not an init/state
 schema. Register only the factory and description. Never add runtime `finish`.
 

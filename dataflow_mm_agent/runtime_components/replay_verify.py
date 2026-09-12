@@ -20,7 +20,7 @@ from ..contracts import (
 )
 from ..env.registry import make_env
 from .host import HostPolicy
-from .tool_loop import ToolLoop
+from .tool_loop import ToolLoop, _safe_result
 
 
 ReplayStatus = Literal["passed", "failed", "diverged", "not_applicable", "error"]
@@ -153,6 +153,23 @@ class ReplayVerify:
             replayed = 0
             try:
                 env = self.env_resolver(rollout.env_id)
+                initial = start_env(
+                    env,
+                    task.scenario.init if task.scenario is not None else None,
+                    workspace,
+                )
+                if initial is not None:
+                    initial = _safe_result(
+                        initial,
+                        content_limits=self.config.content_limits,
+                        max_observation_chars=self.config.max_observation_chars,
+                    )
+                    if not initial.ok:
+                        code = initial.error.code if initial.error is not None else "unknown"
+                        raise RuntimeError(f"Env.start failed with {code}")
+                    if initial.is_final:
+                        raise RuntimeError("Env.start must not terminate an episode")
+
                 host_enabled = bool(rollout.metadata.get("host_tools", False))
                 loop = ToolLoop(
                     env,
@@ -170,19 +187,6 @@ class ReplayVerify:
                     content_limits=self.config.content_limits,
                     max_observation_chars=self.config.max_observation_chars,
                 )
-                initial = start_env(
-                    env,
-                    task.scenario.init if task.scenario is not None else None,
-                    workspace,
-                )
-                if initial is not None:
-                    initial = loop.safe_result(initial)
-                    if not initial.ok:
-                        code = initial.error.code if initial.error is not None else "unknown"
-                        raise RuntimeError(f"Env.start failed with {code}")
-                    if initial.is_final:
-                        raise RuntimeError("Env.start must not terminate an episode")
-
                 terminal_kind: str | None = None
                 terminal_answer: str | None = None
                 previous_response_index = -1

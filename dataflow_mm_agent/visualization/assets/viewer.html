@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-__SCRIPT_HASH__'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>Trajectory Explorer</title>
+  <style>__STYLES__</style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">T</span><div>Trajectory Explorer<small>OFFLINE REPORT</small></div></div>
+    <label class="search-label" for="record-search">查找任务 / Env / episode</label>
+    <input id="record-search" type="search" placeholder="输入标识…" autocomplete="off">
+    <p class="record-count" id="record-count"></p>
+    <nav id="record-list" aria-label="轨迹记录"></nav>
+    <div class="sidebar-note">本页只展示已有记录，不调用模型、不执行工具。分享前请检查消息和图片中是否含有敏感信息。</div>
+  </aside>
+  <main id="main">
+    <header class="page-header">
+      <p class="eyebrow" id="report-title"></p>
+      <h1 id="task-title"></h1>
+      <div class="meta-line" id="record-meta"></div>
+      <div id="variant-tabs" class="variant-tabs" role="group" aria-label="轨迹版本"></div>
+    </header>
+    <nav class="section-nav" aria-label="报告章节">
+      <a href="#task-section">任务与上下文</a><a href="#timeline-section">调用轨迹</a>
+      <a href="#result-section">最终结果</a><a href="#judge-section">Judge / 验证</a>
+      <a href="#messages-section">全部消息</a>
+    </nav>
+    <div id="warnings"></div>
+    <section id="task-section"><div class="section-heading"><h2>任务与初始上下文</h2><span>FIRST DECISION</span></div><div id="task-content"></div></section>
+    <section id="timeline-section"><div class="section-heading"><h2>调用轨迹</h2><span id="step-count"></span></div><div id="timeline"></div></section>
+    <section id="result-section"><div class="section-heading"><h2>最终结果</h2><span>RECORDED OUTCOME</span></div><div id="result-content"></div></section>
+    <section id="judge-section"><div class="section-heading"><h2>Judge 与独立验证</h2><span>SEPARATE EVIDENCE</span></div><div id="judge-content"></div></section>
+    <section id="messages-section"><div class="section-heading"><h2>全部消息</h2><span>CANONICAL HISTORY</span></div><div id="messages-content"></div></section>
+    <footer>Trajectory Explorer · 自包含离线报告 · 消息、分数和控制状态分别展示，不互相推断。</footer>
+  </main>
+  <dialog id="detail-dialog" aria-labelledby="dialog-title">
+    <div class="dialog-header"><h2 id="dialog-title"></h2><button id="dialog-close" type="button">关闭 ×</button></div>
+    <div id="dialog-content"></div>
+  </dialog>
+  <noscript>此离线报告需要浏览器启用 JavaScript 才能展示记录；所有数据已包含在本文件内。</noscript>
+  <script id="trajectory-data" type="application/json">__DATA__</script>
+  <script>__SCRIPT__</script>
+</body>
+</html>

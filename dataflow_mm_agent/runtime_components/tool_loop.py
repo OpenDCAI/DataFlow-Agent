@@ -19,6 +19,45 @@ from .finish import FINISH_TOOL_SPEC
 from .host import HostPolicy, HostTools
 
 
+def _safe_result(
+    result: ToolResult,
+    *,
+    content_limits: ContentLimits,
+    max_observation_chars: int,
+) -> ToolResult:
+    """Normalize observations without requiring a discovered tool catalog."""
+
+    if not isinstance(result, ToolResult):
+        return ToolResult.failure(
+            "environment_error",
+            f"Env returned {type(result).__name__}, expected ToolResult",
+        )
+    try:
+        validate_content(result.content, content_limits)
+        content = []
+        for item in result.content:
+            if (
+                isinstance(item, TextContent)
+                and len(item.text) > max_observation_chars
+            ):
+                omitted = len(item.text) - max_observation_chars
+                content.append(TextContent(
+                    item.text[:max_observation_chars]
+                    + f"\n...[truncated {omitted} chars of {len(item.text)} total]"
+                ))
+            else:
+                content.append(item)
+        return ToolResult(
+            ok=result.ok,
+            content=tuple(content),
+            error=result.error,
+            is_final=result.is_final,
+            metadata=result.metadata,
+        )
+    except (TypeError, ValueError) as exc:
+        return ToolResult.failure("invalid_content", str(exc))
+
+
 @dataclass(frozen=True)
 class ActionExecution:
     result: ToolResult
@@ -28,7 +67,11 @@ class ActionExecution:
 
 
 class ToolLoop:
-    """One episode's authoritative tool catalog and dispatcher."""
+    """One episode's authoritative tool catalog and dispatcher.
+
+    Callers must complete optional Env startup before constructing the loop.
+    The catalog is read once here and retained for this episode.
+    """
 
     def __init__(
         self,
@@ -125,35 +168,11 @@ class ToolLoop:
         )
 
     def safe_result(self, result: ToolResult) -> ToolResult:
-        if not isinstance(result, ToolResult):
-            return ToolResult.failure(
-                "environment_error",
-                f"Env returned {type(result).__name__}, expected ToolResult",
-            )
-        try:
-            validate_content(result.content, self.content_limits)
-            content = []
-            for item in result.content:
-                if (
-                    isinstance(item, TextContent)
-                    and len(item.text) > self.max_observation_chars
-                ):
-                    omitted = len(item.text) - self.max_observation_chars
-                    content.append(TextContent(
-                        item.text[:self.max_observation_chars]
-                        + f"\n...[truncated {omitted} chars of {len(item.text)} total]"
-                    ))
-                else:
-                    content.append(item)
-            return ToolResult(
-                ok=result.ok,
-                content=tuple(content),
-                error=result.error,
-                is_final=result.is_final,
-                metadata=result.metadata,
-            )
-        except (TypeError, ValueError) as exc:
-            return ToolResult.failure("invalid_content", str(exc))
+        return _safe_result(
+            result,
+            content_limits=self.content_limits,
+            max_observation_chars=self.max_observation_chars,
+        )
 
     @staticmethod
     def observation(result: ToolResult, tool_name: str) -> Message:

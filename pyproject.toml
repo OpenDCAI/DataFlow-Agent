@@ -24,6 +24,9 @@ dependencies = [
 [project.optional-dependencies]
 test = ["pytest"]
 
+[project.scripts]
+dataflow-mm-trajectory-html = "dataflow_mm_agent.visualization.__main__:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["dataflow_mm_agent", "dataflow_mm_agent.*"]
@@ -34,4 +37,7 @@ dataflow_mm_agent = [
     "skills/*/agents/*.yaml",
     "skills/*/references/*.md",
     "skills/*/scripts/*.py",
+    "visualization/assets/*.html",
+    "visualization/assets/*.css",
+    "visualization/assets/*.js",
 ]

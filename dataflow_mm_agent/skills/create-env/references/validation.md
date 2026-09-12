@@ -9,6 +9,12 @@
 - Unknown names, invalid JSON-schema arguments, and semantic errors fail with
   stable codes.
 - Optional `start` accepts `None` for a Task without Scenario.
+- Rollout and replay start the Env before discovering tools. A catalog that
+  requires startup works; an Env with no startup hook still works.
+- Startup errors (including invalid initial content or terminal results) stop
+  discovery and execution. Startup and catalog failures still close the Env.
+- Catalog discovery runs once per episode; the model sees the resulting tools
+  before its first decision, with initial observations after task messages.
 - Separate Env instances/workspaces do not share episode state.
 - Query calls leave domain state unchanged; failed compound mutations are
   atomic; optional `close` is idempotent.

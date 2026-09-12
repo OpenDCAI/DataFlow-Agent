@@ -274,6 +274,22 @@ Stateful Envs may additionally expose `start(init, workspace)` and `close()`.
 They do not need to implement a task provider, Scenario, snapshot, or verifier.
 The runner supplies `finish`; an Env must not register its own finish tool.
 
+Rollout and replay use the same startup order:
+
+```text
+create Env -> optional start(init, workspace) -> tools() -> tool loop -> close()
+```
+
+If `start` is absent, it is skipped. If it is present, `tools()` only needs to
+work after startup succeeds. The runtime reads the catalog once, before the
+first model decision or replayed action, and keeps it fixed for that episode.
+Startup failures stop discovery and execution; cleanup still runs when
+available. Model messages retain their order: system prompt, task messages,
+then any initial observation.
+
+When constructing `ToolLoop(env)` directly, complete optional startup first;
+the constructor reads `env.tools()` and does not start the Env itself.
+
 ### MCP adoption
 
 An MCP server can be attached through a thin adapter:
@@ -284,7 +300,13 @@ An MCP server can be attached through a thin adapter:
 
 No framework-specific task/verifier bundle is required. A stateless MCP adapter
 can implement only `tools()` and `call()`; session startup and cleanup can use
-the optional lifecycle hooks when needed. The bundled
+the optional lifecycle hooks when needed. For a session-based MCP, connect and
+complete the MCP handshake in `start()`, then let `tools()` discover the fixed
+catalog through that same session. Keep the session for `call()` and close it
+in `close()`. No pre-generated catalog or separate discovery session is
+required. MCP SDK and transport details remain in the Env package.
+
+The bundled
 [`create-env` workspace skill](dataflow_mm_agent/skills/create-env/SKILL.md)
 documents the adapter workflow and validation requirements.
 
@@ -319,6 +341,7 @@ dataflow-mm-agent/
 │   ├── runtime_components/ # rollout, tool loop, finish, ReplayVerify
 │   ├── operators/          # Generate, Judge, Refine, Filter, Select
 │   ├── serving/            # OpenAI-compatible and Gemini multimodal serving
+│   ├── visualization/      # offline trajectory HTML exporter and viewer
 │   ├── skills/create-env/  # workspace skill for Env and MCP adoption
 │   └── storage/            # task and trajectory stores
 ├── examples/showcases/     # GitHub-native trajectory walkthroughs
@@ -333,6 +356,7 @@ interpreter or dependency boundary.
 
 ## Further reading
 
+- [Offline trajectory HTML reports](docs/trajectory-html.md)
 - [Create an Env or MCP adapter](dataflow_mm_agent/skills/create-env/SKILL.md)
 - [Env contracts and package layout](dataflow_mm_agent/skills/create-env/references/contracts-and-layout.md)
 - [Task generation](dataflow_mm_agent/skills/create-env/references/task-generation.md)

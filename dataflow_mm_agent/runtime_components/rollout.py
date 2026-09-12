@@ -28,7 +28,7 @@ from ..contracts.trajectory import EpisodeStep, Trajectory, utc_now
 from ..env.registry import get_environment_spec, make_env
 from ..serving import ModelResponseFormatError, ModelServing
 from .host import HostPolicy
-from .tool_loop import ToolLoop
+from .tool_loop import ToolLoop, _safe_result
 
 
 _SYSTEM_PROMPT = """You are an autonomous multimodal agent solving a task in a controlled environment.
@@ -345,7 +345,7 @@ class AgentRollout:
             if spec.env_id != task.env_id:
                 close_env(env)
                 raise ValueError("environment description does not match task.env_id")
-            messages: list[Message] = []
+            messages: list[Message] = list(task.messages)
             steps: list[EpisodeStep] = []
             final_answer: str | None = None
             termination_reason = exhaustion_reason
@@ -373,6 +373,25 @@ class AgentRollout:
                     return f"[model_response_format_error] {exc}", 0.0
 
             try:
+                # Some backends can discover tools only after opening a session.
+                initial = start_env(
+                    env,
+                    task.scenario.init if task.scenario is not None else None,
+                    workspace,
+                )
+                if initial is not None:
+                    initial = _safe_result(
+                        initial,
+                        content_limits=self.config.content_limits,
+                        max_observation_chars=self.config.max_observation_chars,
+                    )
+                    if not initial.ok:
+                        messages.append(ToolLoop.observation(initial, "env.start"))
+                        code = initial.error.code if initial.error is not None else "unknown"
+                        raise RuntimeError(f"Env.start failed with {code}")
+                    if initial.is_final:
+                        raise RuntimeError("Env.start must not terminate an episode")
+
                 host_policy = HostPolicy(
                     workspace=workspace,
                     content_limits=self.config.content_limits,
@@ -395,7 +414,7 @@ class AgentRollout:
                     if self.config.include_tool_catalog
                     else "(tools are described by the caller)"
                 )
-                messages.append(Message.text(
+                messages.insert(0, Message.text(
                     "system",
                     self.config.system_prompt.format(
                         tool_catalog=catalog,
@@ -404,22 +423,8 @@ class AgentRollout:
                         ),
                     ),
                 ))
-                messages.extend(task.messages)
-
-                initial = start_env(
-                    env,
-                    task.scenario.init if task.scenario is not None else None,
-                    workspace,
-                )
-                if initial is not None:
-                    initial = loop.safe_result(initial)
-                    if initial.content or not initial.ok:
-                        messages.append(loop.observation(initial, "env.start"))
-                    if not initial.ok:
-                        code = initial.error.code if initial.error is not None else "unknown"
-                        raise RuntimeError(f"Env.start failed with {code}")
-                    if initial.is_final:
-                        raise RuntimeError("Env.start must not terminate an episode")
+                if initial is not None and initial.content:
+                    messages.append(loop.observation(initial, "env.start"))
 
                 for step_index in range(1, step_limit + 1):
                     if continuation_step == step_index:

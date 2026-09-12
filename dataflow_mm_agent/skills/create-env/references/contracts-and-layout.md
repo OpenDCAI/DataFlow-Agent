@@ -33,6 +33,19 @@ An Env can be stateful without requiring a Scenario; `start` then receives
 `None`. A stateless MCP can omit `start`. Snapshots, renderers, artifact
 codecs, and `verify_task` are optional domain capabilities.
 
+Rollout and replay use `create -> optional start -> tools -> calls -> close`.
+If `start` exists, `tools()` may depend on its successful completion; if it is
+absent, the catalog must be available without that hook. Discovery occurs
+once before the first model decision or replayed action and the catalog stays
+fixed for the episode. Startup or catalog failures still invoke cleanup.
+Startup failures must not proceed to discovery.
+
+For a session-based MCP, open the connection and complete its handshake in
+`start`; map `list_tools()` in `tools` and `call_tool()` in `call` using the
+same session, then release it in `close`. A pre-generated catalog is not a
+contract requirement. Direct `ToolLoop(env)` users must start their Env first
+when needed; the loop itself only discovers tools and dispatches actions.
+
 ### Optional capability signatures
 
 ```python
