@@ -38,8 +38,14 @@ Python package: `dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
    [recreate a three-page reference deck as an editable PowerPoint](examples/showcases/03_pptx.md).
 4. **Document-to-diagram synthesis** —
    [turn two incident-runbook pages into an editable operational flow](examples/showcases/04_diagram.md).
-5. **Why a deterministic verifier is necessary** —
-   [inspect a trajectory that received Judge 1.0 but failed exact state verification](examples/showcases/05_why_deterministic_verifier.md).
+5. **Mobile UI automation** —
+   [set weekday, weekend, and reading alarms on an isolated Android device](examples/showcases/05_mobile_weekly_alarms.md).
+6. **Browser-based planning and form interaction** —
+   [save an activity-day schedule under time and budget constraints](examples/showcases/06_playwright_studio_day.md).
+7. **3D scene construction** —
+   [build a low-poly island lighthouse in Blender, with the step-limit outcome preserved](examples/showcases/07_blender_lighthouse.md).
+8. **Why a deterministic verifier is necessary** —
+   [inspect a trajectory that received Judge 1.0 but failed exact state verification](examples/showcases/08_why_deterministic_verifier.md).
 
 The showcase pages use GitHub-native Markdown, full-trajectory GIF previews,
 ordinary image assets under every corresponding tool step, and compact JSON.

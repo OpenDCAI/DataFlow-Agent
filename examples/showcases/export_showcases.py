@@ -867,7 +867,7 @@ def render_verifier_case(
         "verification is added only when the environment exposes a meaningful exact condition.",
         "",
     ])
-    (output_dir / "05_why_deterministic_verifier.md").write_text(
+    (output_dir / "08_why_deterministic_verifier.md").write_text(
         "\n".join(lines), encoding="utf-8"
     )
 

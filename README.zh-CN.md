@@ -36,8 +36,14 @@ Python 包：`dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
    [根据三页参考图复刻一份可编辑的 PowerPoint](examples/showcases/03_pptx.md)。
 4. **从文档合成流程图**——
    [将两页事故响应手册转化为可编辑的操作流程图](examples/showcases/04_diagram.md)。
-5. **为什么需要确定性 Verifier**——
-   [查看一条获得 Judge 1.0 分、却没有通过精确状态验证的轨迹](examples/showcases/05_why_deterministic_verifier.md)。
+5. **移动端 UI 自动化**——
+   [在独立 Android 设备上设置工作日、周末与阅读闹钟](examples/showcases/05_mobile_weekly_alarms.md)。
+6. **浏览器中的规划与表单操作**——
+   [按时间和预算约束安排活动日程并保存方案](examples/showcases/06_playwright_studio_day.md)。
+7. **三维场景搭建**——
+   [在 Blender 中搭建低多边形海岛灯塔，并如实保留步数上限结果](examples/showcases/07_blender_lighthouse.md)。
+8. **为什么需要确定性 Verifier**——
+   [查看一条获得 Judge 1.0 分、却没有通过精确状态验证的轨迹](examples/showcases/08_why_deterministic_verifier.md)。
 
 
 [Showcase 索引](examples/showcases/README.md)。
