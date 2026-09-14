@@ -42,7 +42,11 @@ gate directly, and did not enter Refine.
 | 5 | [Weekly alarms on Android](05_mobile_weekly_alarms.md) | original 80 actions; `finish`; 60 image observations | K2.6 Judge 1.00 · ReplayVerify `not_applicable` |
 | 6 | [Activity-day planning in a browser](06_playwright_studio_day.md) | original 15 actions; `finish`; 7 image observations | K2.6 Judge 1.00 · ReplayVerify `not_applicable` |
 | 7 | [Low-poly island lighthouse in Blender](07_blender_lighthouse.md) | original 64 actions; `max_steps`, no `finish`; 63 image observations | K2.6 Judge 0.9375 · ReplayVerify `not_applicable` |
-| 8 | [Why a deterministic verifier is necessary](08_why_deterministic_verifier.md) | original 8 actions → refined 4 actions, both replayed | Judge 0.30 → 1.00; verifier still failed |
+| 8 | [Reading 2048 from pixels (G1 VLM-Gym)](08_vlmgym_2048.md) | original 44 moves; `finish`; fresh board to a 64 tile | ReplayVerify passed · Judge 1.00 |
+| 9 | [Shisen-Sho path planning on a 12x12 board](09_vlmgym_shisensho.md) | original 10 matches; `environment_final` | ReplayVerify passed · Judge 1.00 |
+| 10 | [Clearing a CIFAR-10 Shisen-Sho board](10_vlmgym_shisensho_cifar10.md) | original 20 matches (2 invalid); board cleared | ReplayVerify passed · Judge 0.9375 |
+| 11 | [Match-3 swaps with cascades](11_vlmgym_swap.md) | original 24 swaps, no rejections; `finish` at 186 points | ReplayVerify passed · Judge 1.00 |
+| 12 | [Why a deterministic verifier is necessary](12_why_deterministic_verifier.md) | original 8 actions → refined 4 actions, both replayed | Judge 0.30 → 1.00; verifier still failed |
 
 The PPT and diagram cases are open-ended authoring tasks. Their
 ReplayVerify status is `not_applicable`; this is intentional rather than a
@@ -57,6 +61,17 @@ impossible for alarms or a saved schedule. Blender reached its 64-step cap and
 has no final answer; the high Judge score does not turn that into a finished
 rollout or a formal render. The browser task used a local fixture, and Android
 used an empty, dedicated emulator that was restored after evidence capture.
+
+The four VLM-Gym cases (08–11) are original-only `gemini-3.8-flash` rollouts of
+the hardest checked-in task per game from `envs/vlmgym`, which reproduces G1's
+VLM-Gym rules and frames. Each passed deterministic ReplayVerify against the
+task's state predicate and was then scored by `AgentMMTrajectoryQualityEvaluator`
+with `gemini-3.8-flash` as Judge and the generic four-criterion rubric (these
+tasks define no `judge_ref`); no Refine was run. The Swap case was re-rolled
+after its status line was changed to show the live score, moves left, and
+shuffle count instead of upstream's constant text. The 12x12 Shisen-Sho board
+has no connectable pair left after its tenth match, which ends the episode with
+`environment_final`.
 
 The diagram example shows the final v23 Refine pass, including its actual input
 trajectory (itself a previous refinement). Its historical, model-reported Judge
@@ -81,7 +96,7 @@ content. `export_showcases.py` converts selected rows into:
 
 ```text
 showcases/
-├── 01_...md ... 08_...md     # human-readable walkthroughs; verifier remains last
+├── 01_...md ... 12_...md     # human-readable walkthroughs; verifier remains last
 ├── assets/                    # referenced PNGs and editable outputs
 └── trajectories/              # compact, machine-readable JSON
 ```
@@ -92,7 +107,8 @@ same complete sequence. Compact trajectory JSON links every step to its exported
 images through `observation_images`. Refined cases use a paired JSON document with
 separate `original` and `refined` records.
 
-The three MCP showcase additions were prepared with an external export script;
+The four VLM-Gym pages were rendered with this exporter's `render_case` from
+replay-verified, judged rollout rows. The three MCP showcase additions were prepared with an external export script;
 no new GIF-generation code or application dependency was added to the package.
 Their compact JSON includes recorded model names, termination status, per-step
 errors, the exact normalized Judge score, and source digests. Host-local path

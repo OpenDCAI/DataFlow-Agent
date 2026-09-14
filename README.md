@@ -44,8 +44,16 @@ Python package: `dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
    [save an activity-day schedule under time and budget constraints](examples/showcases/06_playwright_studio_day.md).
 7. **3D scene construction** —
    [build a low-poly island lighthouse in Blender, with the step-limit outcome preserved](examples/showcases/07_blender_lighthouse.md).
-8. **Why a deterministic verifier is necessary** —
-   [inspect a trajectory that received Judge 1.0 but failed exact state verification](examples/showcases/08_why_deterministic_verifier.md).
+8. **Visual game planning: 2048** —
+   [read tile values from G1 VLM-Gym frames and build a 64 tile from a fresh board](examples/showcases/08_vlmgym_2048.md).
+9. **Visual path planning: Shisen-Sho** —
+   [connect identical tiles on G1's 12x12 board with at most two turns](examples/showcases/09_vlmgym_shisensho.md).
+10. **Class-level visual matching** —
+   [clear a Shisen-Sho board whose tiles are CIFAR-10 photos](examples/showcases/10_vlmgym_shisensho_cifar10.md).
+11. **Match-3 with cascades** —
+   [reach 150 points on G1's Swap board through reshuffles](examples/showcases/11_vlmgym_swap.md).
+12. **Why a deterministic verifier is necessary** —
+   [inspect a trajectory that received Judge 1.0 but failed exact state verification](examples/showcases/12_why_deterministic_verifier.md).
 
 The showcase pages use GitHub-native Markdown, full-trajectory GIF previews,
 ordinary image assets under every corresponding tool step, and compact JSON.

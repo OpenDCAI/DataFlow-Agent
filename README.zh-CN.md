@@ -42,8 +42,16 @@ Python 包：`dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
    [按时间和预算约束安排活动日程并保存方案](examples/showcases/06_playwright_studio_day.md)。
 7. **三维场景搭建**——
    [在 Blender 中搭建低多边形海岛灯塔，并如实保留步数上限结果](examples/showcases/07_blender_lighthouse.md)。
-8. **为什么需要确定性 Verifier**——
-   [查看一条获得 Judge 1.0 分、却没有通过精确状态验证的轨迹](examples/showcases/08_why_deterministic_verifier.md)。
+8. **视觉游戏规划：2048**——
+   [从 G1 VLM-Gym 画面读出数字，从开局合成 64](examples/showcases/08_vlmgym_2048.md)。
+9. **视觉路径规划：连连看**——
+   [在 G1 的 12×12 棋盘上用不超过两次转弯的路径连接相同图块](examples/showcases/09_vlmgym_shisensho.md)。
+10. **类别级视觉匹配**——
+   [清空一盘以 CIFAR-10 照片为图块的连连看](examples/showcases/10_vlmgym_shisensho_cifar10.md)。
+11. **带连锁消除的三消**——
+   [在 G1 的 Swap 棋盘上经历自动洗牌拿到 150 分](examples/showcases/11_vlmgym_swap.md)。
+12. **为什么需要确定性 Verifier**——
+   [查看一条获得 Judge 1.0 分、却没有通过精确状态验证的轨迹](examples/showcases/12_why_deterministic_verifier.md)。
 
 
 [Showcase 索引](examples/showcases/README.md)。

@@ -59,6 +59,47 @@ CASE_CONFIG: dict[str, dict[str, Any]] = {
         ),
         "animation_speed": 1.0,
     },
+    "vlmgym_2048": {
+        "order": 8,
+        "slug": "vlmgym_2048",
+        "title": "Reading 2048 from pixels (G1 VLM-Gym)",
+        "summary": (
+            "Starting from a fresh board, the agent reads every tile value from the "
+            "rendered G1 VLM-Gym screen, plans merges over 44 moves, and builds a 64 tile."
+        ),
+        "animation_speed": 2.0,
+    },
+    "vlmgym_shisensho": {
+        "order": 9,
+        "slug": "vlmgym_shisensho",
+        "title": "Shisen-Sho path planning on a 12x12 board (G1 VLM-Gym)",
+        "summary": (
+            "On G1's full 12x12 board of 36 color-shape tile types, the agent finds "
+            "pairs joined by paths with at most two turns, including routes through "
+            "the empty margin, and removes ten pairs before no connectable pair remains."
+        ),
+        "animation_speed": 1.3,
+    },
+    "vlmgym_shisensho_cifar10": {
+        "order": 10,
+        "slug": "vlmgym_shisensho_cifar10",
+        "title": "Clearing a CIFAR-10 Shisen-Sho board (G1 VLM-Gym)",
+        "summary": (
+            "Tiles are CIFAR-10 photos and only the class matters: the agent groups "
+            "four different photos per class and clears the whole 6x6 board."
+        ),
+        "animation_speed": 1.3,
+    },
+    "vlmgym_swap": {
+        "order": 11,
+        "slug": "vlmgym_swap",
+        "title": "Match-3 swaps with cascades (G1 VLM-Gym)",
+        "summary": (
+            "The agent scans an 8x8 match-3 board for adjacent swaps that complete "
+            "lines, survives automatic reshuffles, and reaches 150 points."
+        ),
+        "animation_speed": 1.3,
+    },
 }
 
 REMOVED_SHOWCASE_ENVS = {"chart"}
@@ -867,7 +908,7 @@ def render_verifier_case(
         "verification is added only when the environment exposes a meaningful exact condition.",
         "",
     ])
-    (output_dir / "08_why_deterministic_verifier.md").write_text(
+    (output_dir / "12_why_deterministic_verifier.md").write_text(
         "\n".join(lines), encoding="utf-8"
     )
 
