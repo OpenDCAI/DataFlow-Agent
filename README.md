@@ -9,21 +9,35 @@ for evaluation, supervised fine-tuning, and reinforcement learning. The current
 canonical content types are text and image; the contracts are designed so that
 additional modalities can be introduced later without making every Env stateful.
 
-This is an extension package built on top of **DataFlow-MM**. Its
-`open-dataflow-mm` dependency is declared by the package and installed
-automatically by `pip`.
-
 Python package: `dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
 
 <table>
   <tr>
-    <td align="center" width="50%">
-      <a href="examples/showcases/01_geometry_proof.md"><img src="examples/showcases/assets/geometry_proof/trajectory.gif" alt="Agent progressively constructing an olympiad geometry proof"></a><br>
-      <sub>Constructing and proving an olympiad geometry problem</sub>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/01_geometry_proof.md"><img src="examples/showcases/assets/geometry_proof/trajectory.gif" height="180" alt="Agent progressively constructing an olympiad geometry proof"></a><br>
+      <sub>Mathematical reasoning · geometry proofs</sub>
     </td>
-    <td align="center" width="50%">
-      <a href="examples/showcases/02_pixel_game.md"><img src="examples/showcases/assets/pixel_game/trajectory.gif" alt="Agent collecting five gems in a visual grid game"></a><br>
-      <sub>Collecting five gems under a deterministic move budget</sub>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/02_pixel_game.md"><img src="examples/showcases/assets/pixel_game/trajectory.gif" height="180" alt="Agent collecting five gems in a Pyxel game"></a><br>
+      <sub>Pyxel game · visual planning</sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/03_pptx.md"><img src="examples/showcases/assets/pptx/trajectory.gif" height="180" alt="Agent recreating a reference deck as an editable PowerPoint"></a><br>
+      <sub>PowerPoint · editable reconstruction</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/05_mobile_weekly_alarms.md"><img src="examples/showcases/assets/mobile_weekly_alarms/trajectory.gif" height="180" alt="Agent setting weekly alarms on an Android phone"></a><br>
+      <sub>Mobile use · Android alarms</sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/07_blender_lighthouse.md"><img src="examples/showcases/assets/blender_lighthouse/trajectory.gif" height="180" alt="Agent building a low-poly island lighthouse in Blender"></a><br>
+      <sub>Blender · 3D scene construction</sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/08_vlmgym_2048.md"><img src="examples/showcases/assets/vlmgym_2048/trajectory.gif" height="180" alt="Agent reading a 2048 board and merging tiles to reach 64"></a><br>
+      <sub>2048 · planning from pixels</sub>
     </td>
   </tr>
 </table>
@@ -74,7 +88,7 @@ package.
 
 ### Recommended: install from a downloaded ZIP
 
-1. On the GitHub repository page, choose **Code → Download ZIP**.
+1. On the repository's `mm-agent` branch page, choose **Code → Download ZIP**.
 2. Extract the archive and open a terminal in the extracted directory—the one
    containing `pyproject.toml`.
 3. Create and activate the recommended Conda environment:
@@ -91,9 +105,6 @@ python -m pip install --upgrade pip
 python -m pip install .
 ```
 
-`pip` installs `dataflow-mm-agent`, its DataFlow-MM base package
-(`open-dataflow-mm`), and the other declared Python dependencies automatically.
-
 5. Verify the installation:
 
 ```bash
@@ -106,9 +117,9 @@ download the new ZIP, extract it, activate the same Conda environment, and run
 
 ### Configure a model backend
 
-Installation itself does not require an API key. A live rollout does. The
-`create_model_serving_from_env()` helper reads configuration from the process
-environment.
+Installation itself does not require an API key; configure your model endpoint
+before a live rollout. `create_model_serving_from_env()` reads configuration
+from the process environment.
 
 For an OpenAI-compatible endpoint:
 
@@ -119,25 +130,18 @@ export API_URL=https://your-endpoint.example/v1
 export DF_API_KEY=your-api-key
 ```
 
-For the Gemini API:
-
-```bash
-export SERVING_BACKEND=gemini
-export MODEL=your-gemini-model
-export GEMINI_API_KEY=your-api-key
-```
-
 On Windows PowerShell, set the same values with `$env:`, for example:
 
 ```powershell
-$env:SERVING_BACKEND = "gemini"
-$env:MODEL = "your-gemini-model"
-$env:GEMINI_API_KEY = "your-api-key"
+$env:SERVING_BACKEND = "openai"
+$env:MODEL = "your-model-name"
+$env:API_URL = "https://your-endpoint.example/v1"
+$env:DF_API_KEY = "your-api-key"
 ```
 
 Set these variables through your shell or secret manager and never commit their
-values. `API_URL` is optional for Gemini and defaults to Google's Generative
-Language API.
+values. Gemini is also supported; see the [serving factory](dataflow_mm_agent/serving/serving_factory.py)
+for its configuration.
 
 ### Development install
 
@@ -151,6 +155,9 @@ A remote MCP adapter can remain small because its tools and integration-specific
 dependencies run in the upstream MCP server.
 
 ## Minimal rollout
+
+This example assumes an external Env pack has registered `my_visual_env`;
+replace that placeholder with your registered Env ID (see [Lightweight Env design](#lightweight-env-design)).
 
 ```python
 from dataflow_mm_agent import AgentRollout, Message, RolloutConfig, Task

@@ -8,20 +8,35 @@
 内容类型是文本和图像；相关契约在设计上允许未来加入更多模态，而不要求所有 Env
 都必须是有状态的。
 
-这是一个建立在 **DataFlow-MM** 之上的扩展包；它已经声明了
-`open-dataflow-mm` 依赖，`pip` 会在安装时自动处理。
-
 Python 包：`dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
 
 <table>
   <tr>
-    <td align="center" width="50%">
-      <a href="examples/showcases/01_geometry_proof.md"><img src="examples/showcases/assets/geometry_proof/trajectory.gif" alt="Agent 逐步构造并证明一道奥林匹克几何题"></a><br>
-      <sub>自主构图并证明一道奥林匹克几何题</sub>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/01_geometry_proof.md"><img src="examples/showcases/assets/geometry_proof/trajectory.gif" height="180" alt="Agent 逐步构造并证明一道奥林匹克几何题"></a><br>
+      <sub>数学推理 · 几何构图与证明</sub>
     </td>
-    <td align="center" width="50%">
-      <a href="examples/showcases/02_pixel_game.md"><img src="examples/showcases/assets/pixel_game/trajectory.gif" alt="Agent 在视觉网格游戏中收集五颗宝石"></a><br>
-      <sub>在确定性步数预算内收集五颗宝石</sub>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/02_pixel_game.md"><img src="examples/showcases/assets/pixel_game/trajectory.gif" height="180" alt="Agent 在 Pyxel 游戏中收集五颗宝石"></a><br>
+      <sub>Pyxel 游戏 · 视觉规划</sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/03_pptx.md"><img src="examples/showcases/assets/pptx/trajectory.gif" height="180" alt="Agent 将参考幻灯片复刻成可编辑的 PowerPoint"></a><br>
+      <sub>PPT 复刻 · 可编辑幻灯片</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/05_mobile_weekly_alarms.md"><img src="examples/showcases/assets/mobile_weekly_alarms/trajectory.gif" height="180" alt="Agent 在 Android 手机中设置每周闹钟"></a><br>
+      <sub>手机操作 · Android 闹钟</sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/07_blender_lighthouse.md"><img src="examples/showcases/assets/blender_lighthouse/trajectory.gif" height="180" alt="Agent 在 Blender 中搭建低多边形海岛灯塔"></a><br>
+      <sub>Blender · 三维场景搭建</sub>
+    </td>
+    <td align="center" width="33%" valign="top">
+      <a href="examples/showcases/08_vlmgym_2048.md"><img src="examples/showcases/assets/vlmgym_2048/trajectory.gif" height="180" alt="Agent 读取 2048 棋盘并合成 64 图块"></a><br>
+      <sub>2048 · 看图规划与合并</sub>
     </td>
   </tr>
 </table>
@@ -53,7 +68,8 @@ Python 包：`dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
 12. **为什么需要确定性 Verifier**——
    [查看一条获得 Judge 1.0 分、却没有通过精确状态验证的轨迹](examples/showcases/12_why_deterministic_verifier.md)。
 
-
+示例页使用 GitHub 原生 Markdown、完整轨迹 GIF 预览、每一步的图片观察和精简
+JSON，无需 JavaScript 或嵌入大量 base64 图片的 HTML。产物与运行记录见
 [Showcase 索引](examples/showcases/README.md)。
 
 ## 安装
@@ -68,7 +84,7 @@ Python 包：`dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
 
 ### 推荐方式：下载 ZIP 后安装
 
-1. 在 GitHub 仓库页面选择 **Code → Download ZIP**。
+1. 在 GitHub 仓库的 `mm-agent` 分支页面选择 **Code → Download ZIP**。
 2. 解压下载的文件，并在解压后的目录中打开终端；该目录应当包含
    `pyproject.toml`。
 3. 创建并激活推荐的 Conda 环境：
@@ -85,9 +101,6 @@ python -m pip install --upgrade pip
 python -m pip install .
 ```
 
-`pip` 会自动安装 `dataflow-mm-agent`、作为基础的 DataFlow-MM
-（`open-dataflow-mm`）以及其他已声明的 Python 依赖。
-
 5. 验证安装结果：
 
 ```bash
@@ -99,7 +112,7 @@ Conda 环境，然后在新目录中运行 `python -m pip install --upgrade .` �
 
 ### 配置模型后端
 
-安装本身不需要 API key，但运行真实 rollout 时需要。
+安装本身不需要 API key；运行 rollout 前，请配置模型接口。
 `create_model_serving_from_env()` 会从当前进程的环境变量中读取配置。
 
 使用 OpenAI-compatible 接口：
@@ -111,24 +124,17 @@ export API_URL=https://your-endpoint.example/v1
 export DF_API_KEY=your-api-key
 ```
 
-使用 Gemini API：
-
-```bash
-export SERVING_BACKEND=gemini
-export MODEL=your-gemini-model
-export GEMINI_API_KEY=your-api-key
-```
-
 在 Windows PowerShell 中，使用 `$env:` 设置同样的变量，例如：
 
 ```powershell
-$env:SERVING_BACKEND = "gemini"
-$env:MODEL = "your-gemini-model"
-$env:GEMINI_API_KEY = "your-api-key"
+$env:SERVING_BACKEND = "openai"
+$env:MODEL = "your-model-name"
+$env:API_URL = "https://your-endpoint.example/v1"
+$env:DF_API_KEY = "your-api-key"
 ```
 
-请通过 shell 或密钥管理服务设置这些变量，不要把实际值提交到仓库。Gemini 的
-`API_URL` 可以省略，此时会使用 Google Generative Language API 的默认地址。
+请通过 shell 或密钥管理服务设置这些变量，不要把实际值提交到仓库。
+也支持 Gemini 后端，配置方式见 [serving factory](dataflow_mm_agent/serving/serving_factory.py)。
 
 ### 开发模式安装
 
@@ -142,6 +148,9 @@ python -m pip install -e ".[test]"
 server 中。
 
 ## 最小 Rollout 示例
+
+下面假设外部 Env 包已经注册了 `my_visual_env`；请将这个占位 ID 替换成已注册的
+Env ID（参见[轻量级 Env 设计](#轻量级-env-设计)）。
 
 ```python
 from dataflow_mm_agent import AgentRollout, Message, RolloutConfig, Task
@@ -271,6 +280,20 @@ def call(self, tool_name: str, args: Mapping[str, Any]) -> ToolResult: ...
 task provider、Scenario、snapshot 或 verifier。Runner 会提供 `finish`；Env
 不得自行注册 finish 工具。
 
+Rollout 和 replay 使用相同的启动顺序：
+
+```text
+创建 Env -> 可选 start(init, workspace) -> tools() -> 工具循环 -> close()
+```
+
+没有 `start` 时直接跳过；实现了 `start` 时，`tools()` 只需在启动成功后可用。
+运行时在第一次模型决策或重放动作之前读取一次工具目录，并在整个 episode 中
+保持固定。启动失败会停止工具发现与执行，但仍会调用可用的清理 hook。模型消息
+顺序不变：system prompt、task messages，然后是可选的初始 observation。
+
+直接构造 `ToolLoop(env)` 时，应先完成可选的启动步骤；构造函数会读取
+`env.tools()`，不会替调用方启动 Env。
+
 ### 接入 MCP
 
 一个 MCP server 可以通过薄 adapter 接入：
@@ -281,6 +304,10 @@ task provider、Scenario、snapshot 或 verifier。Runner 会提供 `finish`；E
 
 不需要框架专属的 task/verifier bundle。无状态 MCP adapter 可以只实现
 `tools()` 和 `call()`；如有需要，会话启动和清理可以使用可选的生命周期 hook。
+有会话的 MCP 在 `start()` 中连接并完成握手，再由 `tools()` 通过同一会话发现
+固定工具目录；`call()` 复用该会话，`close()` 负责关闭。无需预生成 catalog，
+也无需另开一次发现会话；MCP SDK 和传输细节仍由 Env 包负责。
+
 包中附带的 [`create-env` workspace skill](dataflow_mm_agent/skills/create-env/SKILL.md)
 给出了 adapter 工作流和验证要求。
 
@@ -313,6 +340,7 @@ dataflow-mm-agent/
 │   ├── runtime_components/ # rollout、工具循环、finish 和 ReplayVerify
 │   ├── operators/          # Generate、Judge、Refine、Filter 和 Select
 │   ├── serving/            # OpenAI-compatible 与 Gemini 多模态 serving
+│   ├── visualization/      # 离线 trajectory HTML 导出器与查看器
 │   ├── skills/create-env/  # 用于 Env 和 MCP 接入的 workspace skill
 │   └── storage/            # task 与 trajectory store
 ├── examples/showcases/     # GitHub 原生 trajectory 演示
@@ -326,6 +354,7 @@ dataflow-mm-agent/
 
 ## 进一步阅读
 
+- [离线 trajectory HTML 报告](dataflow_mm_agent/visualization/README.md)
 - [创建 Env 或 MCP adapter](dataflow_mm_agent/skills/create-env/SKILL.md)
 - [Env 契约与包结构](dataflow_mm_agent/skills/create-env/references/contracts-and-layout.md)
 - [Task 生成](dataflow_mm_agent/skills/create-env/references/task-generation.md)
