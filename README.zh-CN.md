@@ -213,7 +213,12 @@ store 会在 rollout 前把它解析为普通 `TextContent`，就像把 `image_r
 DataFlow-MM-Agent 沿用 DataFlow 的可组合算子风格，同时将生成、重放和质量评估
 作为彼此独立的关注点：
 
-- **Generate** 运行共享的多模态工具循环，并记录尚未评分的 trajectory。
+- **Generate** 运行共享的多模态工具循环，并记录尚未评分的 trajectory。设置
+  `checkpoint_dir` 后，每完成一条就立即保存为 `<sample key>.jsonl`；重跑时跳过
+  已有非基础设施错误结果的样本；`max_retries` 会重跑抛出异常或以
+  `infrastructure_error` 结束的样本；`run_manifest.jsonl` 记录每次运行的数量、
+  配置和模型用量汇总。serving 适配器上报 token 用量时，每条 trajectory 都会在
+  `metadata.usage` 中记录。
 - **ReplayVerify** 在全新的 Env 中重放已存储的动作；如果任务配置了确定性
   verifier，还会独立执行该 verifier。
 - **Judge** 解析 Task 的可选 `judge_ref`（缺省时注入通用 rubric），逐项评分，
@@ -227,9 +232,51 @@ DataFlow-MM-Agent 沿用 DataFlow 的可组合算子风格，同时将生成、�
   重放原 trajectory 的 `finish` 前动作，恢复成品后再追加最新诊断，让模型只做
   局部续写与修复。
 - **Filter 和 Select** 保留符合流程质量与多样性要求的 trajectory。
+  `AgentMMTrajectorySelector` 只保留同时满足所有已传入条件的 trajectory。所有开关
+  都是可选的：内置字段（`num_steps`、`num_tool_calls`、`num_tool_errors`、
+  `avg_observation_len`、`is_finish`、`replay_passed`、`judge_score` 等），以及通过
+  `register_selector_feature(name, fn)` 注册的自定义字段，其中 `fn(trajectory, row)`
+  可以读取 trajectory 或它在 storage 中的整行。条件可以是一个值（`is_finish=True`）
+  或比较运算（`num_steps={"gte": 2}`）。可选的 `sort_by`、`group_by`、
+  `dedupe_threshold` 和 `max_selected` 用于排序与截断。加权打分由使用者自己注册
+  字段实现，可直接组合 `operators.selector_features` 中公开的内置函数：
+
+  ```python
+  from dataflow_mm_agent.operators import AgentMMTrajectorySelector, register_selector_feature, uses_tool
+  from dataflow_mm_agent.operators import selector_features as sf
+
+  register_selector_feature("use_api_tool", uses_tool("api", successful=True))
+
+  @register_selector_feature("quality_score")
+  def quality_score(trajectory, row):
+      return 0.6 * sf.replay_passed(trajectory, row) + 0.4 * min(sf.num_steps(trajectory, row) / 5, 1)
+
+  selector = AgentMMTrajectorySelector(
+      is_finish=True, use_api_tool=True, quality_score={"gte": 0.5},
+      sort_by="quality_score", group_by="task_id", max_selected=3,
+  )
+  ```
 
 开放式创作任务不需要虚构一个 verifier。它们的 ReplayVerify 状态为
 `not_applicable`，由 Judge 评估渲染结果及其生成过程。
+
+### 导出训练数据
+
+Trajectory 可以转换为 [ms-swift](https://github.com/modelscope/ms-swift) 的
+`messages` JSONL 用于监督微调。导出只做格式转换，不按验证或 Judge 结果筛选。
+
+```bash
+dataflow-mm-export-swift trajectories/*.jsonl -o sft/train.jsonl
+# 或：python -m dataflow_mm_agent.export trajectories/*.jsonl -o sft/train.jsonl
+```
+
+每条 trajectory 导出为一行。system、user、assistant 消息保留原始记录文本
+（assistant 文本即模型原始动作响应）；回应 assistant 的 observation 转为
+`tool_response`；图片转为 `<image>` 标签并按顺序写入 `images`。图片默认按内容
+去重写入 `sft/train_images/` 并使用绝对路径引用，也可用 `--image-mode base64`
+内联。输入可以是 trajectory JSON、`TrajectoryStore` JSONL，或带 `trajectory`
+列的 pipeline JSONL。最后一个 assistant 回合之后的消息会被丢弃，没有 assistant
+回合的 trajectory 会被跳过。
 
 ## 轻量级 Env 设计
 
@@ -339,6 +386,7 @@ dataflow-mm-agent/
 │   ├── env/                # registry、plugin 和进程隔离 adapter
 │   ├── runtime_components/ # rollout、工具循环、finish 和 ReplayVerify
 │   ├── operators/          # Generate、Judge、Refine、Filter 和 Select
+│   ├── export/             # ms-swift 训练数据导出
 │   ├── serving/            # OpenAI-compatible 与 Gemini 多模态 serving
 │   ├── visualization/      # 离线 trajectory HTML 导出器与查看器
 │   ├── skills/create-env/  # 用于 Env 和 MCP 接入的 workspace skill

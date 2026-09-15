@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import json
 import re
 import time
@@ -13,6 +14,7 @@ from urllib.request import Request, urlopen
 
 from ..contracts import ImageContent, Message, TextContent
 from .base_serving import ModelResponseFormatError, ModelServing
+from .usage import record_gemini_usage
 
 
 GeminiTransport = Callable[
@@ -397,6 +399,7 @@ class GeminiServing(ModelServing):
                 payload,
                 self.timeout,
             )
+            record_gemini_usage(response)
             try:
                 return self._response_text(
                     response,
@@ -435,7 +438,9 @@ class GeminiServing(ModelServing):
         results = [""] * len(conversations)
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
-                executor.submit(self._generate_one, messages, options): index
+                executor.submit(
+                    contextvars.copy_context().run, self._generate_one, messages, options
+                ): index
                 for index, (messages, options) in enumerate(
                     zip(conversations, request_options)
                 )

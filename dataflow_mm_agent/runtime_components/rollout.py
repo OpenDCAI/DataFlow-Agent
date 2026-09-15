@@ -8,7 +8,7 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable, Iterator, Literal, Mapping, Sequence
 
@@ -26,7 +26,7 @@ from ..contracts import (
 )
 from ..contracts.trajectory import EpisodeStep, Trajectory, utc_now
 from ..env.registry import get_environment_spec, make_env
-from ..serving import ModelResponseFormatError, ModelServing
+from ..serving import ModelResponseFormatError, ModelServing, track_usage
 from .host import HostPolicy
 from .tool_loop import ToolLoop, _safe_result
 
@@ -323,6 +323,32 @@ class AgentRollout:
         )
 
     def _run_with_response_provider(
+        self,
+        task: Task,
+        response_provider: ResponseProvider,
+        *,
+        exhaustion_reason: str,
+        step_limit: int,
+        continuation_messages: Sequence[Message] = (),
+        continuation_step: int | None = None,
+    ) -> Trajectory:
+        """Run one episode and record the model usage its requests reported."""
+
+        with track_usage() as meter:
+            trajectory = self._run_episode(
+                task,
+                response_provider,
+                exhaustion_reason=exhaustion_reason,
+                step_limit=step_limit,
+                continuation_messages=continuation_messages,
+                continuation_step=continuation_step,
+            )
+        usage = meter.to_dict()
+        if not usage["requests"]:
+            return trajectory
+        return replace(trajectory, metadata={**trajectory.metadata, "usage": usage})
+
+    def _run_episode(
         self,
         task: Task,
         response_provider: ResponseProvider,

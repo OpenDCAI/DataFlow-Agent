@@ -223,7 +223,12 @@ generation, replay, and quality evaluation as separate concerns:
 
 
 - **Generate** runs the shared multimodal tool loop and records the unscored
-  trajectory.
+  trajectory. With `checkpoint_dir`, each finished row is saved immediately as
+  `<sample key>.jsonl`; rerunning skips rows that already have a
+  non-infrastructure result, `max_retries` re-runs rows that raised or ended in
+  `infrastructure_error`, and `run_manifest.jsonl` records each run's counts,
+  configuration, and summed model usage. Every trajectory records its provider
+  token usage in `metadata.usage` when the serving adapter reports it.
 - **ReplayVerify** replays stored actions in a fresh Env and, when configured,
   evaluates an independent deterministic verifier.
 - **Judge** resolves the Task's optional `judge_ref` (or injects the generic
@@ -240,11 +245,56 @@ generation, replay, and quality evaluation as separate concerns:
   actions in a fresh workspace, append the newest diagnosis after restoration,
   and ask the model only for localized continuation edits.
 - **Filter and Select** keep the trajectories that meet the pipeline's quality
-  and diversity requirements.
+  and diversity requirements. `AgentMMTrajectorySelector` keeps a trajectory
+  only when every condition you pass holds. All switches are optional: built-in
+  features (`num_steps`, `num_tool_calls`, `num_tool_errors`, `avg_observation_len`,
+  `is_finish`, `replay_passed`, `judge_score`, ...) and features you register with
+  `register_selector_feature(name, fn)`, where `fn(trajectory, row)` may read the
+  trajectory or its storage row. A condition is a value (`is_finish=True`) or
+  comparisons (`num_steps={"gte": 2}`). Optional `sort_by`, `group_by`,
+  `dedupe_threshold`, and `max_selected` rank and cap the result. Weighted
+  scoring is a custom feature built from the public functions in
+  `operators.selector_features`:
+
+  ```python
+  from dataflow_mm_agent.operators import AgentMMTrajectorySelector, register_selector_feature, uses_tool
+  from dataflow_mm_agent.operators import selector_features as sf
+
+  register_selector_feature("use_api_tool", uses_tool("api", successful=True))
+
+  @register_selector_feature("quality_score")
+  def quality_score(trajectory, row):
+      return 0.6 * sf.replay_passed(trajectory, row) + 0.4 * min(sf.num_steps(trajectory, row) / 5, 1)
+
+  selector = AgentMMTrajectorySelector(
+      is_finish=True, use_api_tool=True, quality_score={"gte": 0.5},
+      sort_by="quality_score", group_by="task_id", max_selected=3,
+  )
+  ```
 
 Open-ended authoring tasks do not need a pretend verifier. Their ReplayVerify
 status is `not_applicable`, while Judge evaluates the rendered result and the
 process that produced it.
+
+### Export training data
+
+Trajectories convert to [ms-swift](https://github.com/modelscope/ms-swift)
+`messages` JSONL for supervised fine-tuning. The export is a format conversion
+only: it does not filter by verification or Judge results.
+
+```bash
+dataflow-mm-export-swift trajectories/*.jsonl -o sft/train.jsonl
+# or: python -m dataflow_mm_agent.export trajectories/*.jsonl -o sft/train.jsonl
+```
+
+Each trajectory becomes one row. System, user, and assistant messages keep the
+recorded text (the assistant text is the model's raw action response);
+observations that answer an assistant turn become `tool_response`, and images
+become `<image>` tags listed in order under `images`. Images are written once to
+`sft/train_images/` and referenced by absolute path, or inlined with
+`--image-mode base64`. Inputs may be trajectory JSON, `TrajectoryStore` JSONL,
+or pipeline JSONL with a `trajectory` column. Messages after the last assistant
+turn are dropped, and a trajectory with no assistant turn is skipped.
 
 ## Lightweight Env design
 
@@ -361,6 +411,7 @@ dataflow-mm-agent/
 │   ├── env/                # registry, plugins, process-isolated adapters
 │   ├── runtime_components/ # rollout, tool loop, finish, ReplayVerify
 │   ├── operators/          # Generate, Judge, Refine, Filter, Select
+│   ├── export/             # ms-swift training-data exporter
 │   ├── serving/            # OpenAI-compatible and Gemini multimodal serving
 │   ├── visualization/      # offline trajectory HTML exporter and viewer
 │   ├── skills/create-env/  # workspace skill for Env and MCP adoption

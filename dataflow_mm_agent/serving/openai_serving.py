@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import contextvars
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Mapping, Sequence
 
 from ..contracts import ImageContent, Message, TextContent
 from .base_serving import ModelServing
+from .usage import record_openai_usage
 
 
 class OpenAICompatibleServing(ModelServing):
@@ -178,6 +180,7 @@ class OpenAICompatibleServing(ModelServing):
         if self.temperature is not None:
             options["temperature"] = self.temperature
         response = self.client.chat.completions.create(**options)
+        record_openai_usage(response)
         return self._response_text(response)
 
     def generate_messages(
@@ -206,7 +209,9 @@ class OpenAICompatibleServing(ModelServing):
         results = [""] * len(conversations)
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
             futures = {
-                executor.submit(self._generate_one, messages, options): index
+                executor.submit(
+                    contextvars.copy_context().run, self._generate_one, messages, options
+                ): index
                 for index, (messages, options) in enumerate(
                     zip(conversations, request_options)
                 )

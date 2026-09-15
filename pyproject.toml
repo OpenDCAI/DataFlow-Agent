@@ -26,6 +26,7 @@ test = ["pytest"]
 
 [project.scripts]
 dataflow-mm-trajectory-html = "dataflow_mm_agent.visualization.__main__:main"
+dataflow-mm-export-swift = "dataflow_mm_agent.export.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
