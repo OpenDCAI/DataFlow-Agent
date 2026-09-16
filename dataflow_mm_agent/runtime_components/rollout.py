@@ -26,29 +26,14 @@ from ..contracts import (
 )
 from ..contracts.trajectory import EpisodeStep, Trajectory, utc_now
 from ..env.registry import get_environment_spec, make_env
+from ..prompts import LANGUAGES, ROLLOUT_SYSTEM_PROMPT, for_language
 from ..serving import ModelResponseFormatError, ModelServing, track_usage
+from .context import ContextPolicy
 from .host import HostPolicy
 from .tool_loop import ToolLoop, _safe_result
 
 
-_SYSTEM_PROMPT = """You are an autonomous multimodal agent solving a task in a controlled environment.
-
-Environment:
-{environment_context}
-
-Available tools:
-{tool_catalog}
-
-At every step respond with exactly one JSON object:
-{{"thought":"brief reasoning","tool":"tool name","args":{{...}}}}
-
-When the task is complete, use:
-{{"thought":"why complete","tool":"finish","args":{{"answer":"final answer"}}}}
-
-Use only listed tools or finish. Images returned by tools are visible in the
-observation message where they appear. Do not invent paths or inspect hidden
-environment state. Follow the language requested by the task messages.
-"""
+_SYSTEM_PROMPT = ROLLOUT_SYSTEM_PROMPT["en"]
 
 
 EnvResolver = Callable[[str], Any]
@@ -64,6 +49,9 @@ WorkspaceRetention = Literal["ephemeral", "full"]
 class RolloutConfig:
     max_steps: int = 64
     system_prompt: str = _SYSTEM_PROMPT
+    language: str = "en"
+    # Which recorded history each live request carries; None sends all of it.
+    context_policy: "ContextPolicy | None" = None
     include_host_tools: bool = True
     include_tool_catalog: bool = True
     validate_tool_names: bool = True
@@ -75,6 +63,15 @@ class RolloutConfig:
     content_limits: ContentLimits = ContentLimits()
 
     def __post_init__(self) -> None:
+        if self.context_policy is not None and not isinstance(self.context_policy, ContextPolicy):
+            raise TypeError("context_policy must be a ContextPolicy or None")
+        if self.language not in LANGUAGES:
+            raise ValueError(f"language must be one of {sorted(LANGUAGES)}")
+        if self.system_prompt == _SYSTEM_PROMPT and self.language != "en":
+            # Only the untouched built-in default follows `language`.
+            object.__setattr__(
+                self, "system_prompt", for_language(ROLLOUT_SYSTEM_PROMPT, self.language)
+            )
         if (
             isinstance(self.max_steps, bool)
             or not isinstance(self.max_steps, int)
@@ -201,14 +198,26 @@ class AgentRollout:
         responses: Sequence[str],
         *,
         continuation_messages: Sequence[Message] = (),
-        compact_live_context: bool = False,
+        live_context: ContextPolicy | None = None,
     ) -> Trajectory:
         """Restore an episode through recorded actions, then continue live.
+
+        Currently unused: the Refiner repairs from a fresh Env instead. This
+        entry point is kept because restoring a recorded prefix is the right
+        primitive for stateful authoring Envs, and it is planned to return as an
+        Env-side repair tool rather than an operator flag.
 
         Prefix responses pass through the same parser, schema validation, tool
         dispatcher, and fresh Env lifecycle as ordinary model output.  No live
         model request is made until every recorded response has executed.
+
+        ``live_context`` overrides ``RolloutConfig.context_policy`` for this
+        call; either way the continuation messages and everything produced after
+        them are never trimmed, and the trajectory records the full history.
         """
+
+        if live_context is None:
+            live_context = self.config.context_policy
 
         prefix = tuple(responses)
         if any(not isinstance(item, str) or not item for item in prefix):
@@ -220,7 +229,6 @@ class AgentRollout:
             raise ValueError("response prefix leaves no step budget for continuation")
         iterator = iter(prefix)
         live_context_start: int | None = None
-        prefix_observation: Message | None = None
 
         def prefixed_live_response(
             messages: Sequence[Message],
@@ -229,40 +237,16 @@ class AgentRollout:
             try:
                 return next(iterator), 0.0
             except StopIteration:
-                nonlocal live_context_start, prefix_observation
+                nonlocal live_context_start
                 request_messages = messages
-                if compact_live_context:
+                if live_context is not None:
                     if live_context_start is None:
                         live_context_start = len(messages) - len(continuation)
-                        prefix_messages = messages[:live_context_start]
-                        prefix_observation = next(
-                            (
-                                message for message in reversed(prefix_messages)
-                                if message.role == "observation"
-                                and any(
-                                    isinstance(item, ImageContent)
-                                    for item in message.content
-                                )
-                            ),
-                            None,
-                        )
-                        if prefix_observation is None:
-                            prefix_observation = next(
-                                (
-                                    message
-                                    for message in reversed(prefix_messages)
-                                    if message.role == "observation"
-                                ),
-                                None,
-                            )
-                    compact: list[Message] = [
-                        messages[0],
-                        *messages[1:1 + len(task.messages)],
-                    ]
-                    if prefix_observation is not None:
-                        compact.append(prefix_observation)
-                    compact.extend(messages[live_context_start:])
-                    request_messages = tuple(compact)
+                    request_messages = live_context.project(
+                        messages,
+                        boundary=live_context_start,
+                        task_message_count=len(task.messages),
+                    )
                 before = time.perf_counter()
                 response = self.sample_responses(
                     request_messages, 1, request_options=request_options
@@ -290,7 +274,7 @@ class AgentRollout:
             metadata={
                 **dict(trajectory.metadata),
                 "response_prefix_steps": len(prefix),
-                "response_prefix_compact_live_context": compact_live_context,
+                "response_prefix_compact_live_context": live_context is not None,
             },
         )
 
@@ -379,6 +363,18 @@ class AgentRollout:
             format_retries_recovered = 0
             tool_names: tuple[str, ...] = ()
 
+            def project(request_messages: Sequence[Message]) -> Sequence[Message]:
+                """Trim recorded history for the request only; the trajectory keeps it."""
+
+                policy = self.config.context_policy
+                if policy is None:
+                    return request_messages
+                return policy.project(
+                    request_messages,
+                    boundary=len(request_messages),
+                    task_message_count=len(task.messages),
+                )
+
             def request_response(
                 request_messages: Sequence[Message],
                 request_options: Mapping[str, Any] | None,
@@ -394,7 +390,7 @@ class AgentRollout:
                 """
 
                 try:
-                    return response_provider(request_messages, request_options)
+                    return response_provider(project(request_messages), request_options)
                 except ModelResponseFormatError as exc:
                     return f"[model_response_format_error] {exc}", 0.0
 

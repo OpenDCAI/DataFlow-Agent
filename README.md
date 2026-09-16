@@ -74,90 +74,15 @@ ordinary image assets under every corresponding tool step, and compact JSON.
 They do not require JavaScript or embed images as base64 inside a large HTML file. See the
 [showcase index](examples/showcases/README.md) for artifacts and run metadata.
 
-## Installation
-
-### Requirements
-
-- Conda, either through Miniconda or Anaconda
-- Internet access during installation so that Python dependencies can be
-  resolved
-
-Concrete visual Envs may have additional browser, rendering, game, or office
-dependencies; those belong to the Env integration rather than this core
-package.
-
-### Recommended: install from a downloaded ZIP
-
-1. On the repository's `mm-agent` branch page, choose **Code → Download ZIP**.
-2. Extract the archive and open a terminal in the extracted directory—the one
-   containing `pyproject.toml`.
-3. Create and activate the recommended Conda environment:
+## Quickstart
 
 ```bash
 conda create -n dataflow-mm-agent python=3.12 pip -y
 conda activate dataflow-mm-agent
-```
-
-4. Upgrade the packaging tools and install the extracted package:
-
-```bash
-python -m pip install --upgrade pip
 python -m pip install .
 ```
 
-5. Verify the installation:
-
-```bash
-python -c "import dataflow_mm_agent as d; print(d.__version__)"
-```
-
-The command should print the installed package version. To upgrade later,
-download the new ZIP, extract it, activate the same Conda environment, and run
-`python -m pip install --upgrade .` from the new directory.
-
-### Configure a model backend
-
-Installation itself does not require an API key; configure your model endpoint
-before a live rollout. `create_model_serving_from_env()` reads configuration
-from the process environment.
-
-For an OpenAI-compatible endpoint:
-
-```bash
-export SERVING_BACKEND=openai
-export MODEL=your-model-name
-export API_URL=https://your-endpoint.example/v1
-export DF_API_KEY=your-api-key
-```
-
-On Windows PowerShell, set the same values with `$env:`, for example:
-
-```powershell
-$env:SERVING_BACKEND = "openai"
-$env:MODEL = "your-model-name"
-$env:API_URL = "https://your-endpoint.example/v1"
-$env:DF_API_KEY = "your-api-key"
-```
-
-Set these variables through your shell or secret manager and never commit their
-values. Gemini is also supported; see the [serving factory](dataflow_mm_agent/serving/serving_factory.py)
-for its configuration.
-
-### Development install
-
-If you plan to edit the source, install it in editable mode with the test extra:
-
-```bash
-python -m pip install -e ".[test]"
-```
-
-A remote MCP adapter can remain small because its tools and integration-specific
-dependencies run in the upstream MCP server.
-
-## Minimal rollout
-
-This example assumes an external Env pack has registered `my_visual_env`;
-replace that placeholder with your registered Env ID (see [Lightweight Env design](#lightweight-env-design)).
+Then point the package at a model endpoint and run a first rollout:
 
 ```python
 from dataflow_mm_agent import AgentRollout, Message, RolloutConfig, Task
@@ -168,133 +93,35 @@ task = Task(
     env_id="my_visual_env",
     messages=(Message.text("user", "Create the requested diagram."),),
 )
-
-serving = create_model_serving_from_env()
 trajectory = AgentRollout(
-    serving=serving,
+    serving=create_model_serving_from_env(),
     config=RolloutConfig(max_steps=32),
 ).run(task)
-
-print(trajectory.termination_reason)
-print(trajectory.steps[-1].action)
 ```
 
-`Task` is reusable: one task may produce many trajectories. Its `messages` may
-contain text and any number of images. `Scenario` is optional private runtime
-input, not a mandatory wrapper around every task. `judge_ref` is an optional
-public score range plus task-specific criteria; when omitted, Judge uses its
-generic rubric.
+[**QUICKSTART**](QUICKSTART.md) covers installation, model backend configuration,
+multimodal tasks, the pipeline stages (Generate, ReplayVerify, Judge, Refine,
+Filter/Select), runtime settings, training-data export, the offline trajectory
+viewer, and the development install.
 
-## Multimodal tasks
+## How it works
 
-```python
-from pathlib import Path
+A `Task` names an Env and carries the messages the model sees. `AgentRollout`
+creates a fresh Env, runs one tool loop, and records every action and
+observation as a `Trajectory`. Operators then compose around that record:
 
-from dataflow_mm_agent import ImageContent, Message, Task, TextContent
+| Stage | What it does |
+| --- | --- |
+| Generate | Runs the tool loop and records unscored trajectories; resumable per sample. |
+| ReplayVerify | Replays stored actions in a fresh Env and runs the task's deterministic verifier. |
+| Judge | Scores the task rubric from the real observations and reports which steps failed. |
+| Refine | Re-explores with the verifier findings, the reviewer suggestion, and the flagged steps. |
+| Filter / Select | Keeps trajectories meeting declarative quality and diversity conditions. |
+| Export | Converts trajectories to ms-swift `messages` JSONL for supervised fine-tuning. |
 
-reference = ImageContent.from_bytes(
-    Path("reference.png").read_bytes(),
-    "image/png",
-    detail="original",
-)
-task = Task(
-    task_id="reconstruct-001",
-    env_id="diagram",
-    messages=(Message.of(
-        "user",
-        (TextContent("Reconstruct this as an editable diagram."), reference),
-    ),),
-)
-```
-
-Images remain first-class content blocks through rollout, Refine, Judge, and
-trajectory storage. They are not converted into text placeholders.
-
-Materialized JSON task stores may keep source documents outside the JSON body
-with confined, SHA-256-pinned `text_ref` blocks (`text/plain` or
-`text/markdown`, UTF-8, at most 512 KiB). The store resolves them to ordinary
-`TextContent` before rollout, just as `image_ref` resolves to inline
-`ImageContent`; unresolved paths never reach the model.
-
-## The trajectory data flow
-
-DataFlow-MM-Agent follows DataFlow's composable-operator style while keeping
-generation, replay, and quality evaluation as separate concerns:
-
-
-- **Generate** runs the shared multimodal tool loop and records the unscored
-  trajectory. With `checkpoint_dir`, each finished row is saved immediately as
-  `<sample key>.jsonl`; rerunning skips rows that already have a
-  non-infrastructure result, `max_retries` re-runs rows that raised or ended in
-  `infrastructure_error`, and `run_manifest.jsonl` records each run's counts,
-  configuration, and summed model usage. Every trajectory records its provider
-  token usage in `metadata.usage` when the serving adapter reports it.
-- **ReplayVerify** replays stored actions in a fresh Env and, when configured,
-  evaluates an independent deterministic verifier.
-- **Judge** resolves the Task's optional `judge_ref` (or injects the generic
-  fallback), scores every configured criterion, and computes `traj_overall` as
-  the arithmetic mean of range-normalized scores. Every environment uses the
-  same rationale-and-scores response; task-specific grading rules live only
-  in the task rubric. Judge does not replace exact state verification. Rubrics over 16,000 serialized characters are evaluated one
-  criterion at a time—with the complete task rubric still injected into every
-  shard—and malformed combined verdicts fall back to the same all-or-nothing
-  shard path.
-- **Refine** receives the original task messages, visual observations, and
-  failure diagnosis, then produces a new trajectory rather than mutating the old
-  one. For stateful visual artifacts it can first replay the recorded pre-finish
-  actions in a fresh workspace, append the newest diagnosis after restoration,
-  and ask the model only for localized continuation edits.
-- **Filter and Select** keep the trajectories that meet the pipeline's quality
-  and diversity requirements. `AgentMMTrajectorySelector` keeps a trajectory
-  only when every condition you pass holds. All switches are optional: built-in
-  features (`num_steps`, `num_tool_calls`, `num_tool_errors`, `avg_observation_len`,
-  `is_finish`, `replay_passed`, `judge_score`, ...) and features you register with
-  `register_selector_feature(name, fn)`, where `fn(trajectory, row)` may read the
-  trajectory or its storage row. A condition is a value (`is_finish=True`) or
-  comparisons (`num_steps={"gte": 2}`). Optional `sort_by`, `group_by`,
-  `dedupe_threshold`, and `max_selected` rank and cap the result. Weighted
-  scoring is a custom feature built from the public functions in
-  `operators.selector_features`:
-
-  ```python
-  from dataflow_mm_agent.operators import AgentMMTrajectorySelector, register_selector_feature, uses_tool
-  from dataflow_mm_agent.operators import selector_features as sf
-
-  register_selector_feature("use_api_tool", uses_tool("api", successful=True))
-
-  @register_selector_feature("quality_score")
-  def quality_score(trajectory, row):
-      return 0.6 * sf.replay_passed(trajectory, row) + 0.4 * min(sf.num_steps(trajectory, row) / 5, 1)
-
-  selector = AgentMMTrajectorySelector(
-      is_finish=True, use_api_tool=True, quality_score={"gte": 0.5},
-      sort_by="quality_score", group_by="task_id", max_selected=3,
-  )
-  ```
-
-Open-ended authoring tasks do not need a pretend verifier. Their ReplayVerify
-status is `not_applicable`, while Judge evaluates the rendered result and the
-process that produced it.
-
-### Export training data
-
-Trajectories convert to [ms-swift](https://github.com/modelscope/ms-swift)
-`messages` JSONL for supervised fine-tuning. The export is a format conversion
-only: it does not filter by verification or Judge results.
-
-```bash
-dataflow-mm-export-swift trajectories/*.jsonl -o sft/train.jsonl
-# or: python -m dataflow_mm_agent.export trajectories/*.jsonl -o sft/train.jsonl
-```
-
-Each trajectory becomes one row. System, user, and assistant messages keep the
-recorded text (the assistant text is the model's raw action response);
-observations that answer an assistant turn become `tool_response`, and images
-become `<image>` tags listed in order under `images`. Images are written once to
-`sft/train_images/` and referenced by absolute path, or inlined with
-`--image-mode base64`. Inputs may be trajectory JSON, `TrajectoryStore` JSONL,
-or pipeline JSONL with a `trajectory` column. Messages after the last assistant
-turn are dropped, and a trajectory with no assistant turn is skipped.
+Judge and ReplayVerify answer different questions: one reviews the process, the
+other reproduces the actions and checks exact state. Open-ended authoring tasks
+report `not_applicable` for replay rather than pretending to have a verifier.
 
 ## Lightweight Env design
 
@@ -409,14 +236,16 @@ dataflow-mm-agent/
 ├── dataflow_mm_agent/
 │   ├── contracts/          # Task, Env, messages, tools, trajectory
 │   ├── env/                # registry, plugins, process-isolated adapters
-│   ├── runtime_components/ # rollout, tool loop, finish, ReplayVerify
+│   ├── runtime_components/ # rollout, tool loop, context policy, ReplayVerify
 │   ├── operators/          # Generate, Judge, Refine, Filter, Select
 │   ├── export/             # ms-swift training-data exporter
+│   ├── prompts.py          # built-in English and Chinese prompt text
 │   ├── serving/            # OpenAI-compatible and Gemini multimodal serving
 │   ├── visualization/      # offline trajectory HTML exporter and viewer
 │   ├── skills/create-env/  # workspace skill for Env and MCP adoption
 │   └── storage/            # task and trajectory stores
 ├── examples/showcases/     # GitHub-native trajectory walkthroughs
+├── QUICKSTART.md
 ├── LICENSE
 └── pyproject.toml
 ```
@@ -428,9 +257,10 @@ interpreter or dependency boundary.
 
 ## Further reading
 
+- [Quickstart: install, configure, and run](QUICKSTART.md)
+- [Showcase index](examples/showcases/README.md)
 - [Offline trajectory HTML reports](dataflow_mm_agent/visualization/README.md)
 - [Create an Env or MCP adapter](dataflow_mm_agent/skills/create-env/SKILL.md)
 - [Env contracts and package layout](dataflow_mm_agent/skills/create-env/references/contracts-and-layout.md)
 - [Task generation](dataflow_mm_agent/skills/create-env/references/task-generation.md)
 - [Validation strategy](dataflow_mm_agent/skills/create-env/references/validation.md)
-- [Showcase index](examples/showcases/README.md)

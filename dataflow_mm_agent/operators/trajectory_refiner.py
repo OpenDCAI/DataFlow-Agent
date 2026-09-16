@@ -6,7 +6,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
 
 from dataflow import get_logger
 from dataflow.core import OperatorABC
@@ -14,60 +14,19 @@ from dataflow.utils.registry import OPERATOR_REGISTRY
 from dataflow.utils.storage import DataFlowStorage
 
 from ..contracts import Content, ImageContent, Message, TaskResolver, TextContent
+from ..prompts import LANGUAGES, REFINE_TEXT, for_language
 from ..serving import ModelServing
 from .utils.trajectory import (
     as_trajectory_dict,
     normal_success,
     observation_content,
     step_error_code,
+    step_thought,
     step_tool_ok,
     steps,
     task_text,
 )
 from .explore_generator import AgentMMExploreGenerator
-
-
-REFINE_CONTEXT_HEADER = """You previously attempted this task and the result was judged low quality.
-
---- YOUR PREVIOUS ATTEMPT TEXT SUMMARY ---
-{prior}
---- END PREVIOUS ATTEMPT TEXT SUMMARY ---
-
-Diagnosis of what went wrong: {diagnosis}
-"""
-
-REFINE_CONTEXT_FOOTER = """
-Now solve the task again, AVOIDING the mistakes above. Be more direct: choose the
-right tool, pass correct arguments, do not loop, and call "finish" with a complete
-final answer as soon as you can support it.
-
-Task: {task}"""
-
-RESTORED_STATE_GUIDANCE = """
-
-The current artifact has already been restored by replaying the recorded actions.
-Treat the latest Judge feedback above as unresolved. Inspect and repair this current
-artifact with localized edits; do not recreate or reset it unless it is genuinely
-unrecoverable. If a duplicated connector label itself causes a collision while its
-destination already states the full branch meaning, removing that redundant label
-is a valid localized repair. Save and inspect the result after the last edit before
-finishing. In PPTX, if a larger font still renders too small because auto-fit shrinks
-it, call manage_shape.update to enlarge the existing text box and/or set
-auto_fit=false before applying format_runs. Use manage_shape.delete for incorrect
-decorative or duplicate shapes, then inspect shape indexes again because deletion
-renumbers later shapes.
-"""
-
-RESTORED_STATE_SYSTEM_CONSTRAINT = """HARD CONTINUATION CONSTRAINT:
-The existing artifact has already been restored in the live environment. You
-must repair that current artifact in place. Never call create_presentation,
-create_presentation_from_template, create_presentation_from_templates,
-auto_generate_presentation, or any other reset/recreation operation. Inspect
-shape indexes, make localized edits, call view_all, save the repaired artifact,
-then finish. For PPTX container/geometry defects, use manage_shape.update or
-manage_shape.delete rather than layering a replacement deck. This constraint
-overrides any impulse to rebuild from scratch.
-"""
 
 
 @OPERATOR_REGISTRY.register()
@@ -84,15 +43,19 @@ class AgentMMTrajectoryRefiner(OperatorABC):
         score_threshold: float | None = 0.6,
         score_key: str = "traj_overall",
         diagnosis_key: str | None = "traj_rationale",
+        suggestion_key: str | None = "traj_refine_suggestion",
+        important_steps_key: str | None = "traj_important_steps",
+        verification_key: str | None = "replay_verification",
+        important_step_window: int = 2,
         original_key: str | None = "trajectory_original",
         system_prompt: str | None = None,
+        language: str = "en",
         max_prior_chars: int = 2000,
         max_prior_images: int | None = 4,
         max_diagnosis_chars: int = 4000,
         validate_tool_names: bool = True,
         structured_actions: bool = False,
         action_format_retries: int = 0,
-        replay_original_prefix: bool = False,
         include_host_tools: bool = True,
         workspace_root: str | Path | None = None,
         workspace_retention: str = "ephemeral",
@@ -107,7 +70,17 @@ class AgentMMTrajectoryRefiner(OperatorABC):
             raise ValueError("max_prior_images must be positive or None")
         if max_diagnosis_chars < 1:
             raise ValueError("max_diagnosis_chars must be positive")
+        if (
+            isinstance(important_step_window, bool)
+            or not isinstance(important_step_window, int)
+            or important_step_window < 0
+        ):
+            raise ValueError("important_step_window must be a non-negative integer")
+        if language not in LANGUAGES:
+            raise ValueError(f"language must be one of {sorted(LANGUAGES)}")
         self.logger = get_logger()
+        self.language = language
+        self.text = for_language(REFINE_TEXT, language)
         self.llm_serving = llm_serving
         if task_resolver is None:
             raise ValueError("AgentMMTrajectoryRefiner requires task_resolver")
@@ -118,6 +91,10 @@ class AgentMMTrajectoryRefiner(OperatorABC):
         self.score_threshold = score_threshold
         self.score_key = score_key
         self.diagnosis_key = diagnosis_key
+        self.suggestion_key = suggestion_key
+        self.important_steps_key = important_steps_key
+        self.verification_key = verification_key
+        self.important_step_window = important_step_window
         self.original_key = original_key
         self.system_prompt = system_prompt
         self.max_prior_chars = max_prior_chars
@@ -125,7 +102,6 @@ class AgentMMTrajectoryRefiner(OperatorABC):
         self.max_diagnosis_chars = max_diagnosis_chars
         self.validate_tool_names = validate_tool_names
         self.include_host_tools = include_host_tools
-        self.replay_original_prefix = replay_original_prefix
         self._generator = AgentMMExploreGenerator(
             serving=llm_serving,
             task_resolver=task_resolver,
@@ -140,26 +116,23 @@ class AgentMMTrajectoryRefiner(OperatorABC):
             workspace_retention=workspace_retention,
         )
 
-    @staticmethod
-    def _diagnose(trajectory: dict[str, Any]) -> str:
+    def _diagnose(self, trajectory: dict[str, Any]) -> str:
         if not normal_success(trajectory):
             answer = trajectory.get("final_answer")
             if answer is None or (isinstance(answer, str) and not answer.strip()):
-                return (
-                    "the agent never produced a final answer (it ran out of "
-                    "steps or stopped without calling finish)."
-                )
+                return self.text["note_no_answer"]
         notes: list[str] = []
         seen_actions: dict[str, int] = {}
         for step in steps(trajectory):
             if step.get("parse_error"):
-                notes.append("one step produced an unparseable (non-JSON) response")
+                notes.append(self.text["note_unparseable"])
             if step_error_code(step) == "unknown_tool":
                 tool = (step.get("action") or {}).get("tool")
-                notes.append(f"a non-existent tool {tool!r} was called")
+                notes.append(self.text["note_unknown_tool"].format(tool=tool))
             if step_tool_ok(step) is False:
-                code = step_error_code(step)
-                notes.append(f"a tool call failed ({code})")
+                notes.append(self.text["note_tool_failed"].format(
+                    code=step_error_code(step)
+                ))
             action = step.get("action") or {}
             tool = action.get("tool")
             if tool and tool != "finish":
@@ -172,16 +145,84 @@ class AgentMMTrajectoryRefiner(OperatorABC):
                 key = f"{tool}:{args}"
                 seen_actions[key] = seen_actions.get(key, 0) + 1
         if any(count > 1 for count in seen_actions.values()):
-            notes.append("the same action was repeated without progress (a loop)")
+            notes.append(self.text["note_loop"])
         if not notes:
-            return (
-                "the answer was judged incomplete or low quality; produce a more "
-                "correct and complete answer."
-            )
+            return self.text["note_low_quality"]
         return "; ".join(dict.fromkeys(notes)) + "."
 
+    @staticmethod
+    def _step_headline(index: int, step: dict[str, Any]) -> str:
+        action = step.get("action") or {}
+        flag = ""
+        if step.get("parse_error"):
+            flag = " [PARSE_ERROR]"
+        elif step_error_code(step) == "unknown_tool":
+            flag = " [INVALID_TOOL]"
+        elif step_tool_ok(step) is False:
+            flag = " [TOOL_ERROR]"
+        return (
+            f"  {index}. tool={action.get('tool')} "
+            f"args={json.dumps(action.get('args', {}), ensure_ascii=False)}{flag}"
+        )
+
+    def _important_indices(
+        self,
+        trajectory: dict[str, Any],
+        important_steps: Sequence[int],
+    ) -> list[int]:
+        """Flagged steps plus ``important_step_window`` neighbours on each side."""
+
+        total = len(steps(trajectory))
+        selected: set[int] = set()
+        for value in important_steps:
+            if isinstance(value, bool) or not isinstance(value, int):
+                continue
+            if not 1 <= value <= total:
+                continue
+            low = max(1, value - self.important_step_window)
+            high = min(total, value + self.important_step_window)
+            selected.update(range(low, high + 1))
+        return sorted(selected)
+
+    def _important_step_messages(
+        self,
+        trajectory: dict[str, Any],
+        important_steps: Sequence[int],
+    ) -> tuple[Message, ...]:
+        """Render flagged steps in full: no text truncation, images attached."""
+
+        indices = self._important_indices(trajectory, important_steps)
+        if not indices:
+            return ()
+        flagged = ", ".join(str(value) for value in sorted(set(important_steps)) if value in
+                            range(1, len(steps(trajectory)) + 1))
+        messages: list[Message] = [Message.text(
+            "user",
+            self.text["important_steps_header"].format(flagged=flagged or "(none)"),
+            name="trajectory_refiner.important_steps",
+        )]
+        all_steps = steps(trajectory)
+        for index in indices:
+            step = all_steps[index - 1]
+            content: list[Content] = [TextContent(
+                f"{self._step_headline(index, step)}\n"
+                f"     thought={json.dumps(step_thought(step), ensure_ascii=False)}\n"
+                + self.text["observation_label"]
+            )]
+            content.extend(observation_content(trajectory, step))
+            messages.append(Message.of(
+                "observation",
+                content,
+                name=f"trajectory_refiner.step{index:03d}",
+            ))
+        return tuple(messages)
+
     def _render_prior(self, trajectory: dict[str, Any]) -> str:
-        """Render a bounded text-only summary; images are attached separately."""
+        """Render a bounded text-only summary; images are attached separately.
+
+        The tail matters most for repair, so an over-budget summary keeps the
+        first and last steps and elides the middle.
+        """
         lines: list[str] = []
         for index, step in enumerate(steps(trajectory), start=1):
             action = step.get("action") or {}
@@ -214,9 +255,27 @@ class AgentMMTrajectoryRefiner(OperatorABC):
                 )
         lines.append(f"  final_answer: {trajectory.get('final_answer')}")
         rendered = "\n".join(lines)
-        if len(rendered) > self.max_prior_chars:
-            rendered = rendered[:self.max_prior_chars] + "\n  ...[truncated]"
-        return rendered
+        if len(rendered) <= self.max_prior_chars:
+            return rendered
+        head_budget = self.max_prior_chars // 4
+        head, tail, size = [], [], 0
+        for line in lines:
+            if size + len(line) + 1 > head_budget:
+                break
+            head.append(line)
+            size += len(line) + 1
+        size = 0
+        for line in reversed(lines[len(head):]):
+            if size + len(line) + 1 > self.max_prior_chars - head_budget:
+                break
+            tail.append(line)
+            size += len(line) + 1
+        omitted = len(lines) - len(head) - len(tail)
+        return "\n".join([
+            *head,
+            self.text["omitted_lines"].format(count=omitted),
+            *reversed(tail),
+        ])
 
     def _prior_images(
         self,
@@ -232,48 +291,15 @@ class AgentMMTrajectoryRefiner(OperatorABC):
             images = images[-self.max_prior_images:]
         return images
 
-    @staticmethod
-    def _response_prefix(trajectory: dict[str, Any]) -> tuple[str, ...]:
-        """Return executable pre-finish responses from a canonical trajectory."""
-
-        messages = trajectory.get("messages")
-        if not isinstance(messages, list):
-            raise ValueError("trajectory messages must be a list")
-        responses: list[str] = []
-        for step in steps(trajectory):
-            if step.get("parse_error"):
-                continue
-            action = step.get("action")
-            if not isinstance(action, dict):
-                continue
-            if action.get("tool") == "finish":
-                break
-            message_index = step.get("response_message_index")
-            if (
-                not isinstance(message_index, int)
-                or not 0 <= message_index < len(messages)
-            ):
-                raise ValueError("trajectory step has an invalid response message")
-            content = messages[message_index].get("content")
-            if not isinstance(content, list):
-                raise ValueError("trajectory response content must be a list")
-            text = "".join(
-                str(item.get("text") or "")
-                for item in content
-                if isinstance(item, dict) and item.get("type") == "text"
-            )
-            if not text:
-                raise ValueError("trajectory response contains no text")
-            responses.append(text)
-        return tuple(responses)
-
     def _refine_instruction_messages(
         self,
         trajectory: dict[str, Any],
         *,
         diagnosis: str,
         task: str,
-        state_restored: bool = False,
+        verification: Any = None,
+        suggestion: str = "",
+        important_steps: Sequence[int] = (),
     ) -> tuple[Message, ...]:
         """Build repair context without reclassifying screenshots as task refs.
 
@@ -284,48 +310,53 @@ class AgentMMTrajectoryRefiner(OperatorABC):
         """
 
         messages: list[Message] = []
-        if state_restored:
-            messages.append(Message.text(
-                "system",
-                RESTORED_STATE_SYSTEM_CONSTRAINT,
-                name="trajectory_refiner.restored_state_constraint",
-            ))
         messages.append(Message.text(
             "user",
-            REFINE_CONTEXT_HEADER.format(
+            self.text["context_header"].format(
                 prior=self._render_prior(trajectory),
                 diagnosis=diagnosis,
             ),
             name="trajectory_refiner.diagnosis",
         ))
-        # A replay-restored repair already receives the freshly replayed final
-        # observation immediately before these continuation messages.  Do not
-        # append older trajectory screenshots afterward, or provider-level
-        # newest-image capping would evict that higher-value restored state.
-        images = [] if state_restored else self._prior_images(trajectory)
+        if verification is not None:
+            try:
+                rendered = json.dumps(verification, ensure_ascii=False, sort_keys=True)
+            except (TypeError, ValueError):
+                rendered = str(verification)
+            messages.append(Message.text(
+                "user",
+                self.text["verification_header"].format(verification=rendered),
+                name="trajectory_refiner.verification",
+            ))
+        if suggestion:
+            messages.append(Message.text(
+                "user",
+                self.text["suggestion_header"].format(suggestion=suggestion),
+                name="trajectory_refiner.suggestion",
+            ))
+        important = self._important_step_messages(trajectory, important_steps)
+        messages.extend(important)
+        # Flagged steps already carry their own untruncated observations; only
+        # fall back to recency-selected screenshots when none were flagged.
+        images = [] if important else self._prior_images(trajectory)
         if images:
-            visual_context: list[Content] = [TextContent(
-                "--- SELECTED PREVIOUS OBSERVATION IMAGES "
-                "(chronological order) ---"
-            )]
+            visual_context: list[Content] = [
+                TextContent(self.text["selected_images_start"])
+            ]
             for step_index, image in images:
                 visual_context.extend((
-                    TextContent(f"Previous observation image from step {step_index}:"),
+                    TextContent(self.text["selected_images_item"].format(index=step_index)),
                     image,
                 ))
-            visual_context.append(TextContent(
-                "--- END SELECTED PREVIOUS OBSERVATION IMAGES ---"
-            ))
+            visual_context.append(TextContent(self.text["selected_images_end"]))
             messages.append(Message.of(
                 "observation",
                 visual_context,
                 name="trajectory_refiner.previous_observations",
             ))
         final_instruction: list[Content] = [
-            TextContent(REFINE_CONTEXT_FOOTER.format(task=task))
+            TextContent(self.text["footer"].format(task=task))
         ]
-        if state_restored:
-            final_instruction.append(TextContent(RESTORED_STATE_GUIDANCE))
         messages.append(Message.of(
             "user",
             final_instruction,
@@ -351,6 +382,9 @@ class AgentMMTrajectoryRefiner(OperatorABC):
         score: Any,
         judge_diagnosis: Any = None,
         earliest_original: Any = None,
+        verification: Any = None,
+        suggestion: Any = None,
+        important_steps: Any = None,
     ) -> dict[str, Any]:
         trajectory = as_trajectory_dict(value)
         if not self._should_refine(trajectory, score):
@@ -379,28 +413,30 @@ class AgentMMTrajectoryRefiner(OperatorABC):
             feedback = judge_diagnosis.strip()
             if len(feedback) > self.max_diagnosis_chars:
                 feedback = feedback[:self.max_diagnosis_chars] + "...[truncated]"
-            diagnosis = f"{diagnosis}\nJudge feedback: {feedback}"
+            diagnosis = f"{diagnosis}\n" + self.text["judge_feedback"].format(
+                feedback=feedback
+            )
         try:
             corrections = self._refine_instruction_messages(
                 trajectory,
                 diagnosis=diagnosis,
                 task=original_task,
-                state_restored=self.replay_original_prefix,
+                verification=verification if isinstance(verification, Mapping) else None,
+                suggestion=suggestion.strip() if isinstance(suggestion, str) else "",
+                important_steps=(
+                    important_steps
+                    if isinstance(important_steps, Sequence)
+                    and not isinstance(important_steps, (str, bytes))
+                    else ()
+                ),
             )
-            runner = self._generator._runner()
-            repaired = (
-                runner.run_with_response_prefix(
-                    task,
-                    self._response_prefix(trajectory),
-                    continuation_messages=corrections,
-                    compact_live_context=True,
-                )
-                if self.replay_original_prefix
-                else runner.run(replace(
-                    task,
-                    messages=(*task.messages, *corrections),
-                ))
-            )
+            # Repair always re-explores from a fresh Env for now. Restoring the
+            # recorded prefix first will come back as an Env-side tool; see
+            # AgentRollout.run_with_response_prefix.
+            repaired = self._generator._runner().run(replace(
+                task,
+                messages=(*task.messages, *corrections),
+            ))
         except Exception as exc:
             self.logger.error(f"[AgentMMTrajectoryRefiner] refine failed: {exc}")
             return {
@@ -449,6 +485,15 @@ class AgentMMTrajectoryRefiner(OperatorABC):
             else [None] * len(dataframe)
         )
         values = dataframe[input_key].tolist()
+
+        def column(name: str | None) -> list[Any]:
+            if name is not None and name in dataframe.columns:
+                return dataframe[name].tolist()
+            return [None] * len(dataframe)
+
+        verifications = column(self.verification_key)
+        suggestions = column(self.suggestion_key)
+        important_steps = column(self.important_steps_key)
         earliest_originals = (
             dataframe[self.original_key].tolist()
             if self.original_key is not None
@@ -464,6 +509,9 @@ class AgentMMTrajectoryRefiner(OperatorABC):
                     score,
                     diagnoses[index],
                     earliest_originals[index],
+                    verifications[index],
+                    suggestions[index],
+                    important_steps[index],
                 ): index
                 for index, (value, score) in enumerate(zip(values, scores))
             }
