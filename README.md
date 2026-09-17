@@ -1,13 +1,17 @@
 # DataFlow-MM-Agent
 
-**English** | [简体中文](README.zh-CN.md) | [Quickstart](QUICKSTART.md)
-
-[![python](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
-[![version](https://img.shields.io/badge/version-1.0.7-blue)](dataflow_mm_agent/version.py)
-[![built on](https://img.shields.io/badge/built%20on-open--dataflow--mm-6c8cff)](https://github.com/OpenDCAI/DataFlow)
-[![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](LICENSE)
+<p align="center">
+  <strong>English</strong> | <a href="README.zh-CN.md">简体中文</a> | <a href="QUICKSTART.md">Quickstart</a>
+</p>
 
 <p align="center"><img src="assets/banner.png" alt="DataFlow-MM-Agent: run multimodal agents in any Env and keep verified trajectories" width="100%"></p>
+
+<p align="center">
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="python"></a>
+  <a href="dataflow_mm_agent/version.py"><img src="https://img.shields.io/badge/version-1.0.7-blue" alt="version"></a>
+  <a href="https://github.com/OpenDCAI/DataFlow"><img src="https://img.shields.io/badge/built%20on-open--dataflow--mm-6c8cff" alt="built on"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license"></a>
+</p>
 
 **Run multimodal agents in visual environments and get every run back as a
 structured, replayable `Trajectory`.**
@@ -23,7 +27,8 @@ Python package: `dataflow_mm_agent`. Text and image are the canonical content
 types today; the contracts leave room for more modalities without making every
 Env stateful.
 
-<table>
+<div align="center">
+<table align="center">
   <tr>
     <td align="center" width="33%" valign="top">
       <a href="examples/showcases/01_geometry_proof.md"><img src="examples/showcases/assets/geometry_proof/trajectory.gif" height="180" alt="Agent progressively constructing an olympiad geometry proof"></a><br>
@@ -53,6 +58,7 @@ Env stateful.
     </td>
   </tr>
 </table>
+</div>
 
 ## What can this package do?
 
@@ -86,23 +92,30 @@ ordinary image assets under every corresponding tool step, and compact JSON.
 They do not require JavaScript or embed images as base64 inside a large HTML file. See the
 [showcase index](examples/showcases/README.md) for artifacts and run metadata.
 
-## Design choices
+## Framework design
 
-- **An Env is two methods.** `tools()` and `call()` are the whole mandatory
-  surface. `start()` and `close()` are optional, and no Env has to supply tasks,
-  verifiers, or snapshots.
-- **The trajectory is the artifact.** Actions, observations, and images are
-  recorded canonically, so a run can be replayed, exported, and reviewed later
-  without the original process.
-- **Judging is not verifying.** A model reviews the process; deterministic
-  replay reproduces the actions and checks exact state. Tasks that have no exact
-  contract report `not_applicable` instead of a pretend verifier.
-- **Images stay images.** Visual observations remain first-class content through
-  rollout, repair, judging, and storage—never flattened into text placeholders.
-- **Envs live outside the core.** Browser, office, game, and rendering
-  dependencies belong to the Env pack, optionally behind a process boundary.
+DataFlow-MM-Agent connects environment interaction, trajectory recording, and
+data processing through shared contracts. This lets new Envs reuse the same
+rollout and evaluation components.
 
-## How it works
+- **Lightweight environment integration.** An Env exposes its tools through
+  `tools()` and executes them through `call()`, with optional `start()` and
+  `close()` hooks. Integration code and application dependencies live in
+  separate Env packs, which can run in their own Python processes.
+- **Structured multimodal trajectories.** A `Trajectory` records model messages,
+  actions, and observations, with text and images as explicit content blocks.
+  The same record supports visualization, action replay in a fresh Env, and
+  training-data export.
+- **Separate verification and quality evaluation.** ReplayVerify replays actions
+  and checks the task's deterministic conditions; Judge evaluates the recorded
+  evidence against a rubric and provides repair suggestions. Their results
+  remain separate so pipelines can use the checks appropriate to each task.
+- **Composable data processing.** Generation, search, verification, judging,
+  refinement, selection, and export are independent operators or utilities.
+  Pipelines can combine them as needed; Refine produces a new trajectory while
+  preserving the original attempt for comparison.
+
+## Trajectory pipeline
 
 A `Task` names an Env and carries the messages the model sees. `AgentRollout`
 creates a fresh Env, runs one tool loop, and records every action and

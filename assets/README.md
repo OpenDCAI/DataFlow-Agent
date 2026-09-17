@@ -3,7 +3,7 @@
 | File | Used in | Source |
 | --- | --- | --- |
 | `banner.png` | top of both READMEs | `pics/DataFlow-AgentMM.png`, downscaled and quantized |
-| `pipeline.png` | `How it works` / `工作方式` | `pics/overview.png`, downscaled and quantized |
+| `pipeline.png` | `Trajectory pipeline` / `轨迹生成与处理流程` | `pics/overview.png`, downscaled and quantized |
 
 Both are 1600px-wide 256-colour PNGs. The full-resolution sources live in
 `pics/` outside the package, together with `pics/PIPELINE_PROMPT.md`, which

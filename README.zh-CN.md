@@ -1,13 +1,17 @@
 # DataFlow-MM-Agent
 
-[English](README.md) | **简体中文** | [快速开始](QUICKSTART.zh-CN.md)
-
-[![python](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
-[![version](https://img.shields.io/badge/version-1.0.7-blue)](dataflow_mm_agent/version.py)
-[![built on](https://img.shields.io/badge/built%20on-open--dataflow--mm-6c8cff)](https://github.com/OpenDCAI/DataFlow)
-[![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](LICENSE)
+<p align="center">
+  <a href="README.md">English</a> | <strong>简体中文</strong> | <a href="QUICKSTART.zh-CN.md">快速开始</a>
+</p>
 
 <p align="center"><img src="assets/banner.png" alt="DataFlow-MM-Agent：在任意 Env 中运行多模态 Agent，并保留可验证的轨迹" width="100%"></p>
+
+<p align="center">
+  <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="python"></a>
+  <a href="dataflow_mm_agent/version.py"><img src="https://img.shields.io/badge/version-1.0.7-blue" alt="version"></a>
+  <a href="https://github.com/OpenDCAI/DataFlow"><img src="https://img.shields.io/badge/built%20on-open--dataflow--mm-6c8cff" alt="built on"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license"></a>
+</p>
 
 **让多模态 Agent 在视觉环境中真正动手，并把每一次运行都还原成结构化、可重放
 的 `Trajectory`。**
@@ -22,7 +26,8 @@
 Python 包：`dataflow_mm_agent`。目前规范化支持的内容类型是文本和图像；相关契约
 在设计上允许未来加入更多模态，而不要求所有 Env 都必须是有状态的。
 
-<table>
+<div align="center">
+<table align="center">
   <tr>
     <td align="center" width="33%" valign="top">
       <a href="examples/showcases/01_geometry_proof.md"><img src="examples/showcases/assets/geometry_proof/trajectory.gif" height="180" alt="Agent 逐步构造并证明一道奥林匹克几何题"></a><br>
@@ -52,6 +57,7 @@ Python 包：`dataflow_mm_agent`。目前规范化支持的内容类型是文本
     </td>
   </tr>
 </table>
+</div>
 
 ## 这个包可以做什么？
 
@@ -84,20 +90,25 @@ Python 包：`dataflow_mm_agent`。目前规范化支持的内容类型是文本
 JSON，无需 JavaScript 或嵌入大量 base64 图片的 HTML。产物与运行记录见
 [Showcase 索引](examples/showcases/README.md)。
 
-## 设计取舍
+## 框架设计
 
-- **一个 Env 只有两个方法。** `tools()` 和 `call()` 就是全部的强制接口；
-  `start()` 和 `close()` 可选，任何 Env 都不必提供任务、verifier 或 snapshot。
-- **Trajectory 就是产物。** 动作、observation 和图像都以规范形式记录，因此一次
-  运行可以在脱离原始进程之后被重放、导出和复查。
-- **评审不等于验证。** 模型评估过程，确定性重放复现动作并检查精确状态。没有
-  精确判定标准的任务返回 `not_applicable`，而不是硬凑一个 verifier。
-- **图像始终是图像。** 视觉 observation 在 rollout、修复、评审和存储中始终是
-  一等内容，不会被压成文本占位符。
-- **Env 放在核心之外。** 浏览器、Office、游戏和渲染依赖属于 Env 包，必要时还可
-  以放到独立进程边界之后。
+DataFlow-MM-Agent 通过统一的数据契约连接环境交互、轨迹记录与数据处理，
+让新接入的 Env 能够复用同一套 rollout 和评估组件。
 
-## 工作方式
+- **轻量接入环境。** Env 通过 `tools()` 暴露工具、通过 `call()` 执行调用，
+  按需实现 `start()` 和 `close()`。集成代码与应用依赖放在独立的 Env 包中，
+  也可以使用单独的 Python 进程运行。
+- **统一记录多模态轨迹。** `Trajectory` 保存模型消息、动作和观察，文本与图像
+  使用明确的内容块表示。同一份记录可以用于可视化、在新 Env 中重放动作，
+  以及导出训练数据。
+- **分别验证结果与评估质量。** ReplayVerify 重放动作并检查任务的确定性条件；
+  Judge 根据轨迹中的证据按 rubric 评分，并给出修复建议。两类结果分别保留，
+  便于 pipeline 按任务特点选择适用的检查方式。
+- **按需组合数据处理步骤。** 生成、搜索、验证、评审、修复、筛选和导出由独立
+  算子或工具完成，可以自由组合成 pipeline。Refine 产生新的 trajectory，
+  原始尝试仍保留用于对比。
+
+## 轨迹生成与处理流程
 
 一个 `Task` 指定 Env 并携带模型看到的消息。`AgentRollout` 创建全新的 Env、
 运行一次工具循环，把每一步动作和 observation 记录成 `Trajectory`。各算子围绕
