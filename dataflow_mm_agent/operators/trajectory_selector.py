@@ -91,11 +91,14 @@ class AgentMMTrajectorySelector(OperatorABC):
         num_tool_calls: Any = None,
         num_distinct_tools: Any = None,
         num_tool_errors: Any = None,
+        num_invalid_tool_calls: Any = None,
         num_parse_errors: Any = None,
+        max_repeated_action: Any = None,
         num_messages: Any = None,
         text_chars: Any = None,
         num_images: Any = None,
         avg_observation_len: Any = None,
+        has_final_answer: Any = None,
         termination_reason: Any = None,
         is_finish: Any = None,
         is_success: Any = None,
@@ -119,9 +122,11 @@ class AgentMMTrajectorySelector(OperatorABC):
         builtin = {
             "num_steps": num_steps, "num_tool_calls": num_tool_calls,
             "num_distinct_tools": num_distinct_tools, "num_tool_errors": num_tool_errors,
-            "num_parse_errors": num_parse_errors, "num_messages": num_messages,
-            "text_chars": text_chars, "num_images": num_images,
-            "avg_observation_len": avg_observation_len, "termination_reason": termination_reason,
+            "num_invalid_tool_calls": num_invalid_tool_calls,
+            "num_parse_errors": num_parse_errors, "max_repeated_action": max_repeated_action,
+            "num_messages": num_messages, "text_chars": text_chars, "num_images": num_images,
+            "avg_observation_len": avg_observation_len, "has_final_answer": has_final_answer,
+            "termination_reason": termination_reason,
             "is_finish": is_finish, "is_success": is_success, "replay_status": replay_status,
             "replay_passed": replay_passed, "judge_score": judge_score,
         }
@@ -154,6 +159,20 @@ class AgentMMTrajectorySelector(OperatorABC):
     def feature_values(self, trajectory: Mapping[str, Any], row: Mapping[str, Any]) -> dict[str, Any]:
         names = list(self.conditions) + ([self.sort_by] if self.sort_by and self.sort_by not in self.conditions else [])
         return {name: self.features[name](trajectory, row) for name in names}
+
+    def reject_reason(
+        self,
+        trajectory: Mapping[str, Any],
+        row: Mapping[str, Any] | None = None,
+    ) -> str | None:
+        """First unmet condition as ``feature(op value)``, or None when it passes."""
+
+        values = self.feature_values(trajectory, row or {})
+        for name, comparisons in self.conditions.items():
+            if not _holds(values[name], comparisons):
+                unmet = ", ".join(f"{op} {expected!r}" for op, expected in comparisons.items())
+                return f"{name}({unmet}) got {values[name]!r}"
+        return None
 
     def select(
         self,

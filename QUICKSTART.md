@@ -182,11 +182,14 @@ every step Judge flagged together with `important_step_window` neighbours,
 rendered in full with their observations and images. The step summary of the
 rest of the attempt keeps the newest steps and elides the middle.
 
-**Filter and Select** keep the trajectories that meet the pipeline's quality and
-diversity requirements. `AgentMMTrajectorySelector` keeps a trajectory only when
-every condition you pass holds. All switches are optional: built-in features
-(`num_steps`, `num_tool_calls`, `num_tool_errors`, `avg_observation_len`,
-`is_finish`, `replay_passed`, `judge_score`, ...) and features you register with
+**Select** keeps the trajectories that meet the pipeline's quality and diversity
+requirements. `AgentMMTrajectorySelector` keeps a trajectory only when every
+condition you pass holds; `reject_reason(trajectory, row)` reports the first
+unmet one, so a pipeline can route rejected rows into Refine. All switches are
+optional: built-in features (`num_steps`, `num_tool_calls`, `num_tool_errors`,
+`num_invalid_tool_calls`, `num_parse_errors`, `max_repeated_action`,
+`avg_observation_len`, `has_final_answer`, `is_success`, `replay_passed`,
+`judge_score`, ...) and features you register with
 `register_selector_feature(name, fn)`, where `fn(trajectory, row)` may read the
 trajectory or its storage row. A condition is a value (`is_finish=True`) or
 comparisons (`num_steps={"gte": 2}`). Optional `sort_by`, `group_by`,

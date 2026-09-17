@@ -1,15 +1,27 @@
 # DataFlow-MM-Agent
 
-**English** | [简体中文](README.zh-CN.md)
+**English** | [简体中文](README.zh-CN.md) | [Quickstart](QUICKSTART.md)
 
-`dataflow-mm-agent` lets multimodal agents interact with visual environments
-and returns every run as a structured `Trajectory`. It can be used to validate
-agent–environment interactions and to synthesize image-grounded trajectory data
-for evaluation, supervised fine-tuning, and reinforcement learning. The current
-canonical content types are text and image; the contracts are designed so that
-additional modalities can be introduced later without making every Env stateful.
+[![python](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-1.0.7-blue)](dataflow_mm_agent/version.py)
+[![built on](https://img.shields.io/badge/built%20on-open--dataflow--mm-6c8cff)](https://github.com/OpenDCAI/DataFlow)
+[![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](LICENSE)
 
-Python package: `dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
+<p align="center"><img src="assets/banner.png" alt="DataFlow-MM-Agent: run multimodal agents in any Env and keep verified trajectories" width="100%"></p>
+
+**Run multimodal agents in visual environments and get every run back as a
+structured, replayable `Trajectory`.**
+
+- **Watch agents act on pixels** — a task, an Env, and one tool loop; every
+  action and rendered observation is recorded.
+- **Synthesize trajectory data** — generate at scale, then verify, judge,
+  repair, select, and export for evaluation, SFT, or RL.
+- **Trust what you keep** — deterministic replay in a fresh Env answers whether
+  the recorded actions really produce the final state.
+
+Python package: `dataflow_mm_agent`. Text and image are the canonical content
+types today; the contracts leave room for more modalities without making every
+Env stateful.
 
 <table>
   <tr>
@@ -74,35 +86,21 @@ ordinary image assets under every corresponding tool step, and compact JSON.
 They do not require JavaScript or embed images as base64 inside a large HTML file. See the
 [showcase index](examples/showcases/README.md) for artifacts and run metadata.
 
-## Quickstart
+## Design choices
 
-```bash
-conda create -n dataflow-mm-agent python=3.12 pip -y
-conda activate dataflow-mm-agent
-python -m pip install .
-```
-
-Then point the package at a model endpoint and run a first rollout:
-
-```python
-from dataflow_mm_agent import AgentRollout, Message, RolloutConfig, Task
-from dataflow_mm_agent.serving import create_model_serving_from_env
-
-task = Task(
-    task_id="draw-001",
-    env_id="my_visual_env",
-    messages=(Message.text("user", "Create the requested diagram."),),
-)
-trajectory = AgentRollout(
-    serving=create_model_serving_from_env(),
-    config=RolloutConfig(max_steps=32),
-).run(task)
-```
-
-[**QUICKSTART**](QUICKSTART.md) covers installation, model backend configuration,
-multimodal tasks, the pipeline stages (Generate, ReplayVerify, Judge, Refine,
-Filter/Select), runtime settings, training-data export, the offline trajectory
-viewer, and the development install.
+- **An Env is two methods.** `tools()` and `call()` are the whole mandatory
+  surface. `start()` and `close()` are optional, and no Env has to supply tasks,
+  verifiers, or snapshots.
+- **The trajectory is the artifact.** Actions, observations, and images are
+  recorded canonically, so a run can be replayed, exported, and reviewed later
+  without the original process.
+- **Judging is not verifying.** A model reviews the process; deterministic
+  replay reproduces the actions and checks exact state. Tasks that have no exact
+  contract report `not_applicable` instead of a pretend verifier.
+- **Images stay images.** Visual observations remain first-class content through
+  rollout, repair, judging, and storage—never flattened into text placeholders.
+- **Envs live outside the core.** Browser, office, game, and rendering
+  dependencies belong to the Env pack, optionally behind a process boundary.
 
 ## How it works
 
@@ -110,14 +108,17 @@ A `Task` names an Env and carries the messages the model sees. `AgentRollout`
 creates a fresh Env, runs one tool loop, and records every action and
 observation as a `Trajectory`. Operators then compose around that record:
 
-| Stage | What it does |
-| --- | --- |
-| Generate | Runs the tool loop and records unscored trajectories; resumable per sample. |
-| ReplayVerify | Replays stored actions in a fresh Env and runs the task's deterministic verifier. |
-| Judge | Scores the task rubric from the real observations and reports which steps failed. |
-| Refine | Re-explores with the verifier findings, the reviewer suggestion, and the flagged steps. |
-| Filter / Select | Keeps trajectories meeting declarative quality and diversity conditions. |
-| Export | Converts trajectories to ms-swift `messages` JSONL for supervised fine-tuning. |
+<p align="center"><img src="assets/pipeline.png" alt="Any Env plugs into tools() + call(), any model into ModelServing, and the operators snap together around the recorded Trajectory" width="100%"></p>
+
+| Stage | Operator | What it does |
+| --- | --- | --- |
+| Generate | `AgentMMExploreGenerator` | Runs the tool loop and records unscored trajectories; resumable per sample. |
+| Search | `AgentMMExploreTreeGenerator` | Branches several actions per node, each child replayed from a fresh Env. |
+| ReplayVerify | `AgentMMReplayVerifier` | Replays stored actions in a fresh Env and runs the task's deterministic verifier. |
+| Judge | `AgentMMTrajectoryQualityEvaluator` | Scores the task rubric from the real observations and reports which steps failed. |
+| Refine | `AgentMMTrajectoryRefiner` | Re-explores with the verifier findings, the reviewer suggestion, and the flagged steps. |
+| Select | `AgentMMTrajectorySelector` | Keeps trajectories meeting declarative quality conditions, then ranks, de-duplicates, and caps them. |
+| Export | `dataflow_mm_agent.export` | Converts trajectories to ms-swift `messages` JSONL for supervised fine-tuning. |
 
 Judge and ReplayVerify answer different questions: one reviews the process, the
 other reproduces the actions and checks exact state. Open-ended authoring tasks
@@ -125,25 +126,23 @@ report `not_applicable` for replay rather than pretending to have a verifier.
 
 ## Lightweight Env design
 
-An Env needs only a tool catalog and a dispatcher:
+An Env is a tool catalog plus a dispatcher. That is the complete mandatory
+surface:
 
 ```python
-from dataflow_mm_agent import TextContent, ToolResult, ToolSpec
-from dataflow_mm_agent.env import register_env
+def tools(self) -> Sequence[ToolSpec]: ...
+def call(self, tool_name: str, args: Mapping[str, Any]) -> ToolResult: ...
+```
 
-
+```python
 class EchoEnv:
     def tools(self):
         return (ToolSpec(
             name="echo",
             description="Echo one string.",
             operation_type="query",
-            input_schema={
-                "type": "object",
-                "properties": {"text": {"type": "string"}},
-                "required": ["text"],
-                "additionalProperties": False,
-            },
+            input_schema={"type": "object", "properties": {"text": {"type": "string"}},
+                          "required": ["text"], "additionalProperties": False},
         ),)
 
     def call(self, tool_name, args):
@@ -152,61 +151,25 @@ class EchoEnv:
         return ToolResult.success((TextContent(args["text"]),))
 
 
-def register():
-    register_env(
-        "echo",
-        EchoEnv,
-        description="A stateless echo service.",
-        modalities=("text",),
-    )
-```
-
-That is the complete mandatory surface:
-
-```python
-def tools(self) -> Sequence[ToolSpec]: ...
-def call(self, tool_name: str, args: Mapping[str, Any]) -> ToolResult: ...
+register_env("echo", EchoEnv, description="A stateless echo service.", modalities=("text",))
 ```
 
 Stateful Envs may additionally expose `start(init, workspace)` and `close()`.
-They do not need to implement a task provider, Scenario, snapshot, or verifier.
-The runner supplies `finish`; an Env must not register its own finish tool.
-
-Rollout and replay use the same startup order:
+They never implement a task provider, Scenario, snapshot, or verifier, and the
+runner supplies `finish` itself. Rollout and replay share one startup order:
 
 ```text
 create Env -> optional start(init, workspace) -> tools() -> tool loop -> close()
 ```
 
-If `start` is absent, it is skipped. If it is present, `tools()` only needs to
-work after startup succeeds. The runtime reads the catalog once, before the
-first model decision or replayed action, and keeps it fixed for that episode.
-Startup failures stop discovery and execution; cleanup still runs when
-available. Model messages retain their order: system prompt, task messages,
-then any initial observation.
+An MCP server attaches through the same surface: map `list_tools()` to
+`ToolSpec`, map `call_tool()` to `ToolResult`, and register the adapter factory.
+A session-based server connects in `start()`, discovers its catalog through that
+session, and releases it in `close()`; the MCP SDK stays in the Env package.
 
-When constructing `ToolLoop(env)` directly, complete optional startup first;
-the constructor reads `env.tools()` and does not start the Env itself.
-
-### MCP adoption
-
-An MCP server can be attached through a thin adapter:
-
-1. map `list_tools()` results to `ToolSpec`;
-2. map `call_tool()` content and errors to `ToolResult`;
-3. register the adapter factory with `register_env`.
-
-No framework-specific task/verifier bundle is required. A stateless MCP adapter
-can implement only `tools()` and `call()`; session startup and cleanup can use
-the optional lifecycle hooks when needed. For a session-based MCP, connect and
-complete the MCP handshake in `start()`, then let `tools()` discover the fixed
-catalog through that same session. Keep the session for `call()` and close it
-in `close()`. No pre-generated catalog or separate discovery session is
-required. MCP SDK and transport details remain in the Env package.
-
-The bundled
-[`create-env` workspace skill](dataflow_mm_agent/skills/create-env/SKILL.md)
-documents the adapter workflow and validation requirements.
+The bundled [`create-env` workspace skill](dataflow_mm_agent/skills/create-env/SKILL.md)
+documents catalog discovery, lifecycle rules, the adapter workflow, and the
+validation gates in full.
 
 ## Core contracts
 
@@ -237,7 +200,7 @@ dataflow-mm-agent/
 │   ├── contracts/          # Task, Env, messages, tools, trajectory
 │   ├── env/                # registry, plugins, process-isolated adapters
 │   ├── runtime_components/ # rollout, tool loop, context policy, ReplayVerify
-│   ├── operators/          # Generate, Judge, Refine, Filter, Select
+│   ├── operators/          # Generate, Judge, Refine, Select
 │   ├── export/             # ms-swift training-data exporter
 │   ├── prompts.py          # built-in English and Chinese prompt text
 │   ├── serving/            # OpenAI-compatible and Gemini multimodal serving
@@ -255,6 +218,18 @@ does not force every rendering or game dependency into `dataflow-mm-agent`.
 An integration may use the package's process proxy when it needs a dedicated
 interpreter or dependency boundary.
 
+## Scope
+
+- Text and image are the canonical content types today; audio and video are not
+  part of the contracts yet.
+- This package ships the runtime, operators, and contracts. Concrete Envs, their
+  dependencies, and their tasks live in separate Env packs.
+- Deterministic replay requires an Env whose actions reproduce the same state;
+  Envs backed by unseeded randomness or external live services cannot be
+  verified this way.
+- Process isolation is optional: use it when an Env needs its own interpreter or
+  dependency boundary.
+
 ## Further reading
 
 - [Quickstart: install, configure, and run](QUICKSTART.md)
@@ -264,3 +239,14 @@ interpreter or dependency boundary.
 - [Env contracts and package layout](dataflow_mm_agent/skills/create-env/references/contracts-and-layout.md)
 - [Task generation](dataflow_mm_agent/skills/create-env/references/task-generation.md)
 - [Validation strategy](dataflow_mm_agent/skills/create-env/references/validation.md)
+
+## License
+
+Apache-2.0. See [LICENSE](LICENSE).
+
+## Acknowledgements
+
+- [DataFlow-MM](https://github.com/OpenDCAI/DataFlow) for the operator, storage,
+  and registry conventions this package builds on.
+- The Env packs and upstream projects behind the bundled showcases; each pack
+  documents its own sources and licenses.

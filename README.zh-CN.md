@@ -1,14 +1,26 @@
 # DataFlow-MM-Agent
 
-[English](README.md) | **简体中文**
+[English](README.md) | **简体中文** | [快速开始](QUICKSTART.zh-CN.md)
 
-`dataflow-mm-agent` 让多模态 Agent 能够在多种视觉环境中交互，并将每次运行
-返回为结构化的 `Trajectory`。它可以用于验证 Agent 与环境之间的交互，也可以
-合成以图像为依据的轨迹数据，用于评测、监督微调和强化学习。目前规范化支持的
-内容类型是文本和图像；相关契约在设计上允许未来加入更多模态，而不要求所有 Env
-都必须是有状态的。
+[![python](https://img.shields.io/badge/python-3.10%2B-blue)](pyproject.toml)
+[![version](https://img.shields.io/badge/version-1.0.7-blue)](dataflow_mm_agent/version.py)
+[![built on](https://img.shields.io/badge/built%20on-open--dataflow--mm-6c8cff)](https://github.com/OpenDCAI/DataFlow)
+[![license](https://img.shields.io/badge/license-Apache--2.0-lightgrey)](LICENSE)
 
-Python 包：`dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
+<p align="center"><img src="assets/banner.png" alt="DataFlow-MM-Agent：在任意 Env 中运行多模态 Agent，并保留可验证的轨迹" width="100%"></p>
+
+**让多模态 Agent 在视觉环境中真正动手，并把每一次运行都还原成结构化、可重放
+的 `Trajectory`。**
+
+- **看着 Agent 在画面上操作** —— 一个任务、一个 Env、一次工具循环；每一步动作
+  和渲染出的 observation 都被完整记录。
+- **合成轨迹数据** —— 规模化生成，然后验证、评审、修复、筛选，再导出用于评测、
+  SFT 或 RL。
+- **保留下来的数据是可信的** —— 在全新 Env 中确定性重放，回答“这串动作是否真的
+  能得到那个最终状态”。
+
+Python 包：`dataflow_mm_agent`。目前规范化支持的内容类型是文本和图像；相关契约
+在设计上允许未来加入更多模态，而不要求所有 Env 都必须是有状态的。
 
 <table>
   <tr>
@@ -72,34 +84,18 @@ Python 包：`dataflow_mm_agent` · Python `>=3.10` · Apache-2.0
 JSON，无需 JavaScript 或嵌入大量 base64 图片的 HTML。产物与运行记录见
 [Showcase 索引](examples/showcases/README.md)。
 
-## 快速开始
+## 设计取舍
 
-```bash
-conda create -n dataflow-mm-agent python=3.12 pip -y
-conda activate dataflow-mm-agent
-python -m pip install .
-```
-
-配置好模型后端后，跑通第一次 rollout：
-
-```python
-from dataflow_mm_agent import AgentRollout, Message, RolloutConfig, Task
-from dataflow_mm_agent.serving import create_model_serving_from_env
-
-task = Task(
-    task_id="draw-001",
-    env_id="my_visual_env",
-    messages=(Message.text("user", "Create the requested diagram."),),
-)
-trajectory = AgentRollout(
-    serving=create_model_serving_from_env(),
-    config=RolloutConfig(max_steps=32),
-).run(task)
-```
-
-[**快速开始文档**](QUICKSTART.zh-CN.md) 涵盖安装、模型后端配置、多模态任务、
-流程各阶段（Generate、ReplayVerify、Judge、Refine、Filter/Select）、运行期设置、
-训练数据导出、离线轨迹查看器，以及开发模式安装。
+- **一个 Env 只有两个方法。** `tools()` 和 `call()` 就是全部的强制接口；
+  `start()` 和 `close()` 可选，任何 Env 都不必提供任务、verifier 或 snapshot。
+- **Trajectory 就是产物。** 动作、observation 和图像都以规范形式记录，因此一次
+  运行可以在脱离原始进程之后被重放、导出和复查。
+- **评审不等于验证。** 模型评估过程，确定性重放复现动作并检查精确状态。没有
+  精确判定标准的任务返回 `not_applicable`，而不是硬凑一个 verifier。
+- **图像始终是图像。** 视觉 observation 在 rollout、修复、评审和存储中始终是
+  一等内容，不会被压成文本占位符。
+- **Env 放在核心之外。** 浏览器、Office、游戏和渲染依赖属于 Env 包，必要时还可
+  以放到独立进程边界之后。
 
 ## 工作方式
 
@@ -107,39 +103,39 @@ trajectory = AgentRollout(
 运行一次工具循环，把每一步动作和 observation 记录成 `Trajectory`。各算子围绕
 这份记录组合：
 
-| 阶段 | 做什么 |
-| --- | --- |
-| Generate | 运行工具循环并记录未评分的 trajectory，支持逐条续跑 |
-| ReplayVerify | 在全新 Env 中重放已记录的动作，并执行任务自带的确定性 verifier |
-| Judge | 依据真实 observation 按 rubric 评分，并指出哪些步骤出了问题 |
-| Refine | 带着 verifier 结论、评审建议和被标记的步骤重新探索 |
-| Filter / Select | 按声明式的质量与多样性条件保留 trajectory |
-| Export | 把 trajectory 转成 ms-swift 的 `messages` JSONL 用于监督微调 |
+<p align="center"><img src="assets/pipeline.png" alt="任意 Env 插进 tools() + call()，任意模型插进 ModelServing，各算子围绕记录下来的 Trajectory 自由拼接" width="100%"></p>
+
+| 阶段 | 算子 | 做什么 |
+| --- | --- | --- |
+| Generate | `AgentMMExploreGenerator` | 运行工具循环并记录未评分的 trajectory，支持逐条续跑 |
+| Search | `AgentMMExploreTreeGenerator` | 每个节点分支出多个动作，每个子节点都从全新 Env 重放得到 |
+| ReplayVerify | `AgentMMReplayVerifier` | 在全新 Env 中重放已记录的动作，并执行任务自带的确定性 verifier |
+| Judge | `AgentMMTrajectoryQualityEvaluator` | 依据真实 observation 按 rubric 评分，并指出哪些步骤出了问题 |
+| Refine | `AgentMMTrajectoryRefiner` | 带着 verifier 结论、评审建议和被标记的步骤重新探索 |
+| Select | `AgentMMTrajectorySelector` | 按声明式条件筛选 trajectory，再排序、去重并截断数量 |
+| Export | `dataflow_mm_agent.export` | 把 trajectory 转成 ms-swift 的 `messages` JSONL 用于监督微调 |
 
 Judge 和 ReplayVerify 回答的是不同问题：前者评估过程，后者重放动作并检查精确
 状态。开放式创作任务的 replay 结果是 `not_applicable`，而不是硬凑一个 verifier。
 
 ## 轻量级 Env 设计
 
-一个 Env 只需要提供工具目录和调用分发器：
+一个 Env 就是工具目录加调用分发器，下面是全部的强制接口：
 
 ```python
-from dataflow_mm_agent import TextContent, ToolResult, ToolSpec
-from dataflow_mm_agent.env import register_env
+def tools(self) -> Sequence[ToolSpec]: ...
+def call(self, tool_name: str, args: Mapping[str, Any]) -> ToolResult: ...
+```
 
-
+```python
 class EchoEnv:
     def tools(self):
         return (ToolSpec(
             name="echo",
             description="Echo one string.",
             operation_type="query",
-            input_schema={
-                "type": "object",
-                "properties": {"text": {"type": "string"}},
-                "required": ["text"],
-                "additionalProperties": False,
-            },
+            input_schema={"type": "object", "properties": {"text": {"type": "string"}},
+                          "required": ["text"], "additionalProperties": False},
         ),)
 
     def call(self, tool_name, args):
@@ -148,56 +144,24 @@ class EchoEnv:
         return ToolResult.success((TextContent(args["text"]),))
 
 
-def register():
-    register_env(
-        "echo",
-        EchoEnv,
-        description="A stateless echo service.",
-        modalities=("text",),
-    )
-```
-
-下面就是完整的强制接口：
-
-```python
-def tools(self) -> Sequence[ToolSpec]: ...
-def call(self, tool_name: str, args: Mapping[str, Any]) -> ToolResult: ...
+register_env("echo", EchoEnv, description="A stateless echo service.", modalities=("text",))
 ```
 
 有状态 Env 可以额外实现 `start(init, workspace)` 和 `close()`，但不需要实现
-task provider、Scenario、snapshot 或 verifier。Runner 会提供 `finish`；Env
-不得自行注册 finish 工具。
-
+task provider、Scenario、snapshot 或 verifier，`finish` 由 runner 提供。
 Rollout 和 replay 使用相同的启动顺序：
 
 ```text
 创建 Env -> 可选 start(init, workspace) -> tools() -> 工具循环 -> close()
 ```
 
-没有 `start` 时直接跳过；实现了 `start` 时，`tools()` 只需在启动成功后可用。
-运行时在第一次模型决策或重放动作之前读取一次工具目录，并在整个 episode 中
-保持固定。启动失败会停止工具发现与执行，但仍会调用可用的清理 hook。模型消息
-顺序不变：system prompt、task messages，然后是可选的初始 observation。
-
-直接构造 `ToolLoop(env)` 时，应先完成可选的启动步骤；构造函数会读取
-`env.tools()`，不会替调用方启动 Env。
-
-### 接入 MCP
-
-一个 MCP server 可以通过薄 adapter 接入：
-
-1. 将 `list_tools()` 的结果映射成 `ToolSpec`；
-2. 将 `call_tool()` 的内容和错误映射成 `ToolResult`；
-3. 使用 `register_env` 注册 adapter factory。
-
-不需要框架专属的 task/verifier bundle。无状态 MCP adapter 可以只实现
-`tools()` 和 `call()`；如有需要，会话启动和清理可以使用可选的生命周期 hook。
-有会话的 MCP 在 `start()` 中连接并完成握手，再由 `tools()` 通过同一会话发现
-固定工具目录；`call()` 复用该会话，`close()` 负责关闭。无需预生成 catalog，
-也无需另开一次发现会话；MCP SDK 和传输细节仍由 Env 包负责。
+MCP server 通过同一套接口接入：把 `list_tools()` 映射成 `ToolSpec`，把
+`call_tool()` 映射成 `ToolResult`，再注册 adapter factory。有会话的 server 在
+`start()` 中连接、通过同一会话发现工具目录、并在 `close()` 中释放；MCP SDK
+仍然留在 Env 包里。
 
 包中附带的 [`create-env` workspace skill](dataflow_mm_agent/skills/create-env/SKILL.md)
-给出了 adapter 工作流和验证要求。
+完整给出了工具目录发现、生命周期规则、adapter 工作流和验证要求。
 
 ## 核心契约
 
@@ -226,7 +190,7 @@ dataflow-mm-agent/
 │   ├── contracts/          # Task、Env、消息、工具和 trajectory
 │   ├── env/                # registry、plugin 和进程隔离 adapter
 │   ├── runtime_components/ # rollout、工具循环、上下文策略和 ReplayVerify
-│   ├── operators/          # Generate、Judge、Refine、Filter 和 Select
+│   ├── operators/          # Generate、Judge、Refine 和 Select
 │   ├── export/             # ms-swift 训练数据导出
 │   ├── prompts.py          # 内置的中英双语提示词
 │   ├── serving/            # OpenAI-compatible 与 Gemini 多模态 serving
@@ -243,6 +207,14 @@ dataflow-mm-agent/
 `dataflow-mm-agent` 同时安装所有渲染或游戏依赖。如果某个集成需要独立的解释器
 或依赖边界，可以使用本包提供的进程代理。
 
+## 适用范围
+
+- 目前规范化的内容类型是文本和图像，音频和视频尚未进入契约。
+- 本包提供运行时、算子和契约；具体的 Env、它们的依赖和任务由独立的 Env 包提供。
+- 确定性重放要求 Env 的动作能复现同一状态；依赖无种子随机性或外部在线服务的
+  Env 无法用这种方式验证。
+- 进程隔离是可选项：只有当 Env 需要独立解释器或依赖边界时才需要启用。
+
 ## 进一步阅读
 
 - [快速开始：安装、配置与运行](QUICKSTART.zh-CN.md)
@@ -252,3 +224,14 @@ dataflow-mm-agent/
 - [Env 契约与包结构](dataflow_mm_agent/skills/create-env/references/contracts-and-layout.md)
 - [任务生成](dataflow_mm_agent/skills/create-env/references/task-generation.md)
 - [验证策略](dataflow_mm_agent/skills/create-env/references/validation.md)
+
+## 许可证
+
+Apache-2.0，详见 [LICENSE](LICENSE)。
+
+## 致谢
+
+- [DataFlow-MM](https://github.com/OpenDCAI/DataFlow)：本包沿用了它的算子、
+  存储和 registry 约定。
+- 各 Showcase 背后的 Env 包与上游项目；每个 Env 包都在自己的文档中说明来源与
+  许可证。

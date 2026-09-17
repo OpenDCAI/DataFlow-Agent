@@ -166,9 +166,12 @@ DataFlow-MM-Agent 沿用 DataFlow 的可组合算子风格，同时将生成、�
   verifier 失败的检查项、评审给出的修改建议，以及 Judge 标记的每个关键步骤及其
   前后 `important_step_window` 步，这些步骤连同 observation 和图片完整呈现、不做
   截断。其余步骤的摘要保留最新的步骤并省略中间部分。
-- **Filter 和 Select** 保留符合流程质量与多样性要求的 trajectory。
-  `AgentMMTrajectorySelector` 只保留同时满足所有已传入条件的 trajectory。所有开关
-  都是可选的：内置字段（`num_steps`、`num_tool_calls`、`num_tool_errors`、
+- **Select** 保留符合流程质量与多样性要求的 trajectory。
+  `AgentMMTrajectorySelector` 只保留同时满足所有已传入条件的 trajectory；
+  `reject_reason(trajectory, row)` 返回第一个未满足的条件，pipeline 可以据此把被
+  筛掉的行送进 Refine 分支。所有开关都是可选的：内置字段（`num_steps`、
+  `num_tool_calls`、`num_tool_errors`、`num_invalid_tool_calls`、
+  `num_parse_errors`、`max_repeated_action`、`has_final_answer`、`is_success`、
   `avg_observation_len`、`is_finish`、`replay_passed`、`judge_score` 等），以及通过
   `register_selector_feature(name, fn)` 注册的自定义字段，其中 `fn(trajectory, row)`
   可以读取 trajectory 或它在 storage 中的整行。条件可以是一个值（`is_finish=True`）

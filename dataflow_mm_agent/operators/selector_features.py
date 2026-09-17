@@ -73,6 +73,24 @@ def num_tool_errors(trajectory: Mapping[str, Any], _row: Mapping[str, Any]) -> i
     return sum(step.get("tool_ok") is False for step in steps(trajectory))
 
 
+def num_invalid_tool_calls(trajectory: Mapping[str, Any], _row: Mapping[str, Any]) -> int:
+    """Calls to a tool the Env does not expose."""
+    return sum(step.get("error_code") == "unknown_tool" for step in steps(trajectory))
+
+
+def max_repeated_action(trajectory: Mapping[str, Any], _row: Mapping[str, Any]) -> int:
+    """How often the most repeated tool call (same name and arguments) occurs."""
+    counts: dict[str, int] = {}
+    for action in _tool_actions(trajectory):
+        try:
+            args = json.dumps(action.get("args", {}), sort_keys=True, ensure_ascii=False)
+        except (TypeError, ValueError):
+            args = str(action.get("args"))
+        key = f"{action.get('tool')}:{args}"
+        counts[key] = counts.get(key, 0) + 1
+    return max(counts.values(), default=0)
+
+
 def num_parse_errors(trajectory: Mapping[str, Any], _row: Mapping[str, Any]) -> int:
     return sum(bool(step.get("parse_error")) for step in steps(trajectory))
 
@@ -96,6 +114,11 @@ def avg_observation_len(trajectory: Mapping[str, Any], _row: Mapping[str, Any]) 
     if not trajectory_steps:
         return 0.0
     return sum(len(observation_text(trajectory, step)) for step in trajectory_steps) / len(trajectory_steps)
+
+
+def has_final_answer(trajectory: Mapping[str, Any], _row: Mapping[str, Any]) -> bool:
+    answer = trajectory.get("final_answer")
+    return isinstance(answer, str) and bool(answer.strip())
 
 
 def termination_reason(trajectory: Mapping[str, Any], _row: Mapping[str, Any]) -> Any:
@@ -152,9 +175,11 @@ def uses_tool(tool: str, *, min_calls: int = 1, successful: bool = False) -> Fea
 BUILTIN_FEATURES: dict[str, FeatureFn] = {
     fn.__name__: fn
     for fn in (
-        num_steps, num_tool_calls, num_distinct_tools, num_tool_errors, num_parse_errors,
-        num_messages, text_chars, num_images, avg_observation_len, termination_reason,
-        is_finish, is_success, replay_status, replay_passed, judge_score,
+        num_steps, num_tool_calls, num_distinct_tools, num_tool_errors,
+        num_invalid_tool_calls, num_parse_errors, max_repeated_action, num_messages,
+        text_chars, num_images, avg_observation_len, has_final_answer,
+        termination_reason, is_finish, is_success, replay_status, replay_passed,
+        judge_score,
     )
 }
 for _name, _fn in BUILTIN_FEATURES.items():
