@@ -1,8 +1,4 @@
-# DataFlow-MM-Agent
-
-<p align="center">
-  <strong>English</strong> | <a href="README.zh-CN.md">简体中文</a> | <a href="QUICKSTART.md">Quickstart</a>
-</p>
+<h1 align="center">DataFlow-MM-Agent</h1>
 
 <p align="center"><img src="assets/banner.png" alt="DataFlow-MM-Agent: run multimodal agents in any Env and keep verified trajectories" width="100%"></p>
 
@@ -26,6 +22,17 @@ structured, replayable `Trajectory`.**
 Python package: `dataflow_mm_agent`. Text and image are the canonical content
 types today; the contracts leave room for more modalities without making every
 Env stateful.
+
+<p align="center">
+  <strong>English</strong> | <a href="README.zh-CN.md">简体中文</a>
+</p>
+<p align="center">
+  <a href="#showcases">Showcases</a> | <a href="#framework">Framework</a> | <a href="#pipeline">Pipeline</a> | <a href="#contract">Contract</a> | <a href="#further-reading">Further reading</a>
+</p>
+
+<a name="showcases"></a>
+
+## What can this package do?
 
 <div align="center">
 <table align="center">
@@ -60,8 +67,6 @@ Env stateful.
 </table>
 </div>
 
-## What can this package do?
-
 1. **Image-grounded mathematical reasoning** —
    [watch an agent construct and prove an olympiad geometry problem](examples/showcases/01_geometry_proof.md).
 2. **Visual planning in planar games** —
@@ -92,6 +97,16 @@ ordinary image assets under every corresponding tool step, and compact JSON.
 They do not require JavaScript or embed images as base64 inside a large HTML file. See the
 [showcase index](examples/showcases/README.md) for artifacts and run metadata.
 
+## Quickstart
+
+Download the `mm-agent` branch and install the extracted package with
+`python -m pip install .`. Configure an OpenAI-compatible model endpoint,
+register an Env, and run your first task.
+See the [detailed Quickstart](QUICKSTART.md) for environment setup, model
+configuration, rollout examples, and pipeline usage.
+
+<a name="framework"></a>
+
 ## Framework design
 
 DataFlow-MM-Agent connects environment interaction, trajectory recording, and
@@ -114,6 +129,8 @@ rollout and evaluation components.
   refinement, selection, and export are independent operators or utilities.
   Pipelines can combine them as needed; Refine produces a new trajectory while
   preserving the original attempt for comparison.
+
+<a name="pipeline"></a>
 
 ## Trajectory pipeline
 
@@ -183,6 +200,8 @@ session, and releases it in `close()`; the MCP SDK stays in the Env package.
 The bundled [`create-env` workspace skill](dataflow_mm_agent/skills/create-env/SKILL.md)
 documents catalog discovery, lifecycle rules, the adapter workflow, and the
 validation gates in full.
+
+<a name="contract"></a>
 
 ## Core contracts
 

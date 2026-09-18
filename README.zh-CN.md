@@ -1,8 +1,4 @@
-# DataFlow-MM-Agent
-
-<p align="center">
-  <a href="README.md">English</a> | <strong>简体中文</strong> | <a href="QUICKSTART.zh-CN.md">快速开始</a>
-</p>
+<h1 align="center">DataFlow-MM-Agent</h1>
 
 <p align="center"><img src="assets/banner.png" alt="DataFlow-MM-Agent：在任意 Env 中运行多模态 Agent，并保留可验证的轨迹" width="100%"></p>
 
@@ -25,6 +21,17 @@
 
 Python 包：`dataflow_mm_agent`。目前规范化支持的内容类型是文本和图像；相关契约
 在设计上允许未来加入更多模态，而不要求所有 Env 都必须是有状态的。
+
+<p align="center">
+  <a href="README.md">English</a> | <strong>简体中文</strong>
+</p>
+<p align="center">
+  <a href="#showcases">Showcases</a> | <a href="#framework">Framework</a> | <a href="#pipeline">Pipeline</a> | <a href="#contract">Contract</a> | <a href="#further-reading">Further reading</a>
+</p>
+
+<a name="showcases"></a>
+
+## 这个包可以做什么？
 
 <div align="center">
 <table align="center">
@@ -59,8 +66,6 @@ Python 包：`dataflow_mm_agent`。目前规范化支持的内容类型是文本
 </table>
 </div>
 
-## 这个包可以做什么？
-
 1. **基于图像的数学推理**——
    [观看 Agent 构图并证明一道奥林匹克几何题](examples/showcases/01_geometry_proof.md)。
 2. **平面游戏中的视觉规划**——
@@ -90,6 +95,14 @@ Python 包：`dataflow_mm_agent`。目前规范化支持的内容类型是文本
 JSON，无需 JavaScript 或嵌入大量 base64 图片的 HTML。产物与运行记录见
 [Showcase 索引](examples/showcases/README.md)。
 
+## 快速开始
+
+下载 `mm-agent` 分支，在解压后的目录运行 `python -m pip install .`，
+配置 OpenAI-compatible 模型接口并注册 Env，即可开始运行任务。
+环境准备、模型配置、首条 rollout 和 pipeline 用法见[详细 Quickstart 指南](QUICKSTART.zh-CN.md)。
+
+<a name="framework"></a>
+
 ## 框架设计
 
 DataFlow-MM-Agent 通过统一的数据契约连接环境交互、轨迹记录与数据处理，
@@ -107,6 +120,8 @@ DataFlow-MM-Agent 通过统一的数据契约连接环境交互、轨迹记录�
 - **按需组合数据处理步骤。** 生成、搜索、验证、评审、修复、筛选和导出由独立
   算子或工具完成，可以自由组合成 pipeline。Refine 产生新的 trajectory，
   原始尝试仍保留用于对比。
+
+<a name="pipeline"></a>
 
 ## 轨迹生成与处理流程
 
@@ -174,6 +189,8 @@ MCP server 通过同一套接口接入：把 `list_tools()` 映射成 `ToolSpec`
 包中附带的 [`create-env` workspace skill](dataflow_mm_agent/skills/create-env/SKILL.md)
 完整给出了工具目录发现、生命周期规则、adapter 工作流和验证要求。
 
+<a name="contract"></a>
+
 ## 核心契约
 
 ```text
@@ -225,6 +242,8 @@ dataflow-mm-agent/
 - 确定性重放要求 Env 的动作能复现同一状态；依赖无种子随机性或外部在线服务的
   Env 无法用这种方式验证。
 - 进程隔离是可选项：只有当 Env 需要独立解释器或依赖边界时才需要启用。
+
+<a name="further-reading"></a>
 
 ## 进一步阅读
 
