@@ -1,10 +1,10 @@
-<h1 align="center">DataFlow-MM-Agent</h1>
+<h1 align="center">DataFlow-AgentMM</h1>
 
-<p align="center"><img src="assets/banner.png" alt="DataFlow-MM-Agent: run multimodal agents in any Env and keep verified trajectories" width="100%"></p>
+<p align="center"><img src="assets/banner.png" alt="DataFlow-AgentMM: run multimodal agents in any Env and keep verified trajectories" width="100%"></p>
 
 <p align="center">
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="python"></a>
-  <a href="dataflow_mm_agent/version.py"><img src="https://img.shields.io/badge/version-1.0.7-blue" alt="version"></a>
+  <a href="dataflow_agentmm/version.py"><img src="https://img.shields.io/badge/version-1.0.7-blue" alt="version"></a>
   <a href="https://github.com/OpenDCAI/DataFlow"><img src="https://img.shields.io/badge/built%20on-open--dataflow--mm-6c8cff" alt="built on"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license"></a>
 </p>
@@ -15,11 +15,11 @@ structured, replayable `Trajectory`.**
 - **Watch agents act on pixels** — a task, an Env, and one tool loop; every
   action and rendered observation is recorded.
 - **Synthesize trajectory data** — generate at scale, then verify, judge,
-  repair, select, and export for evaluation, SFT, or RL.
+  repair, and select trajectories for downstream use.
 - **Trust what you keep** — deterministic replay in a fresh Env answers whether
   the recorded actions really produce the final state.
 
-Python package: `dataflow_mm_agent`. Text and image are the canonical content
+Python package: `dataflow_agentmm`. Text and image are the canonical content
 types today; the contracts leave room for more modalities without making every
 Env stateful.
 
@@ -109,7 +109,7 @@ configuration, rollout examples, and pipeline usage.
 
 ## Framework design
 
-DataFlow-MM-Agent connects environment interaction, trajectory recording, and
+DataFlow-AgentMM connects environment interaction, trajectory recording, and
 data processing through shared contracts. This lets new Envs reuse the same
 rollout and evaluation components.
 
@@ -120,7 +120,7 @@ rollout and evaluation components.
 - **Structured multimodal trajectories.** A `Trajectory` records model messages,
   actions, and observations, with text and images as explicit content blocks.
   The same record supports visualization, action replay in a fresh Env, and
-  training-data export.
+  conversion to ms-swift format.
 - **Separate verification and quality evaluation.** ReplayVerify replays actions
   and checks the task's deterministic conditions; Judge evaluates the recorded
   evidence against a rubric and provides repair suggestions. Their results
@@ -148,7 +148,7 @@ observation as a `Trajectory`. Operators then compose around that record:
 | Judge | `AgentMMTrajectoryQualityEvaluator` | Scores the task rubric from the real observations and reports which steps failed. |
 | Refine | `AgentMMTrajectoryRefiner` | Re-explores with the verifier findings, the reviewer suggestion, and the flagged steps. |
 | Select | `AgentMMTrajectorySelector` | Keeps trajectories meeting declarative quality conditions, then ranks, de-duplicates, and caps them. |
-| Export | `dataflow_mm_agent.export` | Converts trajectories to ms-swift `messages` JSONL for supervised fine-tuning. |
+| Export | `dataflow_agentmm.export` | Converts trajectories to ms-swift `messages` JSONL format. |
 
 Judge and ReplayVerify answer different questions: one reviews the process, the
 other reproduces the actions and checks exact state. Open-ended authoring tasks
@@ -197,7 +197,7 @@ An MCP server attaches through the same surface: map `list_tools()` to
 A session-based server connects in `start()`, discovers its catalog through that
 session, and releases it in `close()`; the MCP SDK stays in the Env package.
 
-The bundled [`create-env` workspace skill](dataflow_mm_agent/skills/create-env/SKILL.md)
+The bundled [`create-env` workspace skill](dataflow_agentmm/skills/create-env/SKILL.md)
 documents catalog discovery, lifecycle rules, the adapter workflow, and the
 validation gates in full.
 
@@ -227,13 +227,13 @@ Trajectory + TaskResolver + optional VerifierResolver
 ## Repository layout
 
 ```text
-dataflow-mm-agent/
-├── dataflow_mm_agent/
+dataflow-agentmm/
+├── dataflow_agentmm/
 │   ├── contracts/          # Task, Env, messages, tools, trajectory
 │   ├── env/                # registry, plugins, process-isolated adapters
 │   ├── runtime_components/ # rollout, tool loop, context policy, ReplayVerify
 │   ├── operators/          # Generate, Judge, Refine, Select
-│   ├── export/             # ms-swift training-data exporter
+│   ├── export/             # ms-swift format conversion
 │   ├── prompts.py          # built-in English and Chinese prompt text
 │   ├── serving/            # OpenAI-compatible and Gemini multimodal serving
 │   ├── visualization/      # offline trajectory HTML exporter and viewer
@@ -246,7 +246,7 @@ dataflow-mm-agent/
 ```
 
 Concrete Envs are outside the core distribution so installing one integration
-does not force every rendering or game dependency into `dataflow-mm-agent`.
+does not force every rendering or game dependency into `dataflow-agentmm`.
 An integration may use the package's process proxy when it needs a dedicated
 interpreter or dependency boundary.
 
@@ -266,11 +266,11 @@ interpreter or dependency boundary.
 
 - [Quickstart: install, configure, and run](QUICKSTART.md)
 - [Showcase index](examples/showcases/README.md)
-- [Offline trajectory HTML reports](dataflow_mm_agent/visualization/README.md)
-- [Create an Env or MCP adapter](dataflow_mm_agent/skills/create-env/SKILL.md)
-- [Env contracts and package layout](dataflow_mm_agent/skills/create-env/references/contracts-and-layout.md)
-- [Task generation](dataflow_mm_agent/skills/create-env/references/task-generation.md)
-- [Validation strategy](dataflow_mm_agent/skills/create-env/references/validation.md)
+- [Offline trajectory HTML reports](dataflow_agentmm/visualization/README.md)
+- [Create an Env or MCP adapter](dataflow_agentmm/skills/create-env/SKILL.md)
+- [Env contracts and package layout](dataflow_agentmm/skills/create-env/references/contracts-and-layout.md)
+- [Task generation](dataflow_agentmm/skills/create-env/references/task-generation.md)
+- [Validation strategy](dataflow_agentmm/skills/create-env/references/validation.md)
 
 ## License
 

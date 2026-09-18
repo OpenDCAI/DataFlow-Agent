@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-compact-v2",
+  "format": "dataflow-agentmm-showcase-compact-v2",
   "task_id": "playwright-studio-day-001",
   "env_id": "playwright_mcp",
   "task_prompt": "我想参加 LIN Studio Day，帮我在这个活动站安排一下日程：http://127.0.0.1:8765/ 。我十点才能到，下午五点前要走，中午十二点到一点想留出来吃饭。设计、编程和演讲各选一场，时间别冲突，选还有名额的，总共不要超过500元；有几个合适的方案就选便宜一点的。\n\n原来草稿里的早场我去不了了。新方案就叫「LIN Studio Day」，备注写「带电脑；需要无障碍座位」。先帮我保存好方案，不用报名或付款，弄好后告诉我当天的安排和总价。",

@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-refine-pair-v2",
+  "format": "dataflow-agentmm-showcase-refine-pair-v2",
   "task_id": "task0003",
   "env_id": "pixel_game",
   "task_prompt": "完成画面中的网格任务：收集全部宝石，然后让 BOT 返回 START。可以使用 observe 查看画面、使用 play 移动；只有在实际画面确认已无剩余宝石且 BOT 已回到 START 后才能调用 finish。请使用中文进行简要推理并给出最终回答；工具名、方向枚举和 JSON 键保持英文。",

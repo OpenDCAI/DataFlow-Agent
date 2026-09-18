@@ -595,7 +595,7 @@ def render_case(
     )
     if is_refine_pair:
         compact = {
-            "format": "dataflow-mm-agent-showcase-refine-pair-v2",
+            "format": "dataflow-agentmm-showcase-refine-pair-v2",
             "task_id": row.get("task_id"),
             "env_id": env_id,
             "task_prompt": prompt,
@@ -609,7 +609,7 @@ def render_case(
         }
     else:
         compact = {
-            "format": "dataflow-mm-agent-showcase-compact-v2",
+            "format": "dataflow-agentmm-showcase-compact-v2",
             "task_id": row.get("task_id"),
             "env_id": env_id,
             "task_prompt": prompt,
@@ -801,7 +801,7 @@ def render_verifier_case(
         speed=1.3,
     )
     compact = {
-        "format": "dataflow-mm-agent-showcase-refine-pair-v2",
+        "format": "dataflow-agentmm-showcase-refine-pair-v2",
         "task_id": refined.get("task_id"),
         "env_id": refined.get("env_id"),
         "task_prompt": prompt,

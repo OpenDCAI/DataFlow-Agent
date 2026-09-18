@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-compact-v2",
+  "format": "dataflow-agentmm-showcase-compact-v2",
   "task_id": "task0003",
   "env_id": "vlmgym_2048",
   "task_prompt": "You are now playing the 2048 game. 2048 is a sliding tile puzzle game where you combine numbered tiles to create a tile with the value 2048.\n\nRule:\nOnly tiles with the SAME number merge when they collide. After each move, a new tile (2 or 4) appears randomly on the board. The game ends when there are no more valid moves.\n\nAvailable actions (call the move tool):\n- up: slide all tiles upward\n- right: slide all tiles to the right\n- down: slide all tiles downward\n- left: slide all tiles to the left\n\nBefore each move, briefly describe the board you see and think about the outcome of each direction.\n\nGoal: create a tile of 64 or higher. Call finish only after the tool results confirm the goal.",

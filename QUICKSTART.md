@@ -2,7 +2,7 @@
 
 **English** | [简体中文](QUICKSTART.zh-CN.md) · [← README](README.md)
 
-Everything needed to install `dataflow-mm-agent`, point it at a model, run a
+Everything needed to install `dataflow-agentmm`, point it at a model, run a
 first rollout, and use the bundled tools.
 
 ## Contents
@@ -13,7 +13,7 @@ first rollout, and use the bundled tools.
 - [Multimodal tasks](#multimodal-tasks)
 - [Pipeline stages](#pipeline-stages)
 - [Runtime settings](#runtime-settings)
-- [Export training data](#export-training-data)
+- [Export to ms-swift](#export-to-ms-swift)
 - [Read a trajectory](#read-a-trajectory)
 - [Development install and tests](#development-install-and-tests)
 
@@ -33,8 +33,8 @@ dependencies; those belong to the Env integration rather than this core package.
 3. Create and activate the recommended Conda environment:
 
 ```bash
-conda create -n dataflow-mm-agent python=3.12 pip -y
-conda activate dataflow-mm-agent
+conda create -n dataflow-agentmm python=3.12 pip -y
+conda activate dataflow-agentmm
 ```
 
 4. Upgrade the packaging tools and install the extracted package:
@@ -47,7 +47,7 @@ python -m pip install .
 5. Verify the installation:
 
 ```bash
-python -c "import dataflow_mm_agent as d; print(d.__version__)"
+python -c "import dataflow_agentmm as d; print(d.__version__)"
 ```
 
 The command should print the installed package version. To upgrade later,
@@ -80,7 +80,7 @@ $env:DF_API_KEY = "your-api-key"
 
 Set these variables through your shell or secret manager and never commit their
 values. Gemini is also supported; see the
-[serving factory](dataflow_mm_agent/serving/serving_factory.py) for its
+[serving factory](dataflow_agentmm/serving/serving_factory.py) for its
 configuration.
 
 ## First rollout
@@ -90,8 +90,8 @@ replace that placeholder with your registered Env ID (see
 [Lightweight Env design](README.md#lightweight-env-design)).
 
 ```python
-from dataflow_mm_agent import AgentRollout, Message, RolloutConfig, Task
-from dataflow_mm_agent.serving import create_model_serving_from_env
+from dataflow_agentmm import AgentRollout, Message, RolloutConfig, Task
+from dataflow_agentmm.serving import create_model_serving_from_env
 
 task = Task(
     task_id="draw-001",
@@ -120,7 +120,7 @@ generic rubric.
 ```python
 from pathlib import Path
 
-from dataflow_mm_agent import ImageContent, Message, Task, TextContent
+from dataflow_agentmm import ImageContent, Message, Task, TextContent
 
 reference = ImageContent.from_bytes(
     Path("reference.png").read_bytes(),
@@ -198,8 +198,8 @@ is a custom feature built from the public functions in
 `operators.selector_features`:
 
 ```python
-from dataflow_mm_agent.operators import AgentMMTrajectorySelector, register_selector_feature, uses_tool
-from dataflow_mm_agent.operators import selector_features as sf
+from dataflow_agentmm.operators import AgentMMTrajectorySelector, register_selector_feature, uses_tool
+from dataflow_agentmm.operators import selector_features as sf
 
 register_selector_feature("use_api_tool", uses_tool("api", successful=True))
 
@@ -230,33 +230,33 @@ are available. Trimming applies to the request only: the trajectory always
 records everything, so replay, export, and review are unaffected.
 
 ```python
-from dataflow_mm_agent.runtime_components import ContextPolicy, RolloutConfig
+from dataflow_agentmm.runtime_components import ContextPolicy, RolloutConfig
 
 config = RolloutConfig(max_steps=64, context_policy=ContextPolicy(keep_last_steps=3))
 ```
 
 **Prompt language.** Built-in prompts ship in English and Chinese
-(`dataflow_mm_agent/prompts.py`). Pass `language="zh"` to `RolloutConfig`,
+(`dataflow_agentmm/prompts.py`). Pass `language="zh"` to `RolloutConfig`,
 `AgentMMTrajectoryQualityEvaluator`, or `AgentMMTrajectoryRefiner` to switch the
 system prompt, the generic rubric text, and the repair templates; an explicit
 `system_prompt=` always wins. Task language still comes from the Task messages.
 
-## Export training data
+## Export to ms-swift
 
 Trajectories convert to [ms-swift](https://github.com/modelscope/ms-swift)
-`messages` JSONL for supervised fine-tuning. The export is a format conversion
+`messages` JSONL format. The export is a format conversion
 only: it does not filter by verification or Judge results.
 
 ```bash
-dataflow-mm-export-swift trajectories/*.jsonl -o sft/train.jsonl
-# or: python -m dataflow_mm_agent.export trajectories/*.jsonl -o sft/train.jsonl
+dataflow-agentmm-export-swift trajectories/*.jsonl -o exports/trajectories.jsonl
+# or: python -m dataflow_agentmm.export trajectories/*.jsonl -o exports/trajectories.jsonl
 ```
 
 Each trajectory becomes one row. System, user, and assistant messages keep the
 recorded text (the assistant text is the model's raw action response);
 observations that answer an assistant turn become `tool_response`, and images
 become `<image>` tags listed in order under `images`. Images are written once to
-`sft/train_images/` and referenced by absolute path, or inlined with
+`exports/trajectories_images/` and referenced by absolute path, or inlined with
 `--image-mode base64`. Inputs may be trajectory JSON, `TrajectoryStore` JSONL,
 or pipeline JSONL with a `trajectory` column. Messages after the last assistant
 turn are dropped, and a trajectory with no assistant turn is skipped.
@@ -267,11 +267,11 @@ Export any trajectory, pipeline JSONL, or rollout directory as one offline HTML
 page with every action, observation, and image:
 
 ```bash
-dataflow-mm-trajectory-html trajectory.json -o report.html
-# or: python -m dataflow_mm_agent.visualization trajectory.json -o report.html
+dataflow-agentmm-trajectory-html trajectory.json -o report.html
+# or: python -m dataflow_agentmm.visualization trajectory.json -o report.html
 ```
 
-See the [viewer documentation](dataflow_mm_agent/visualization/README.md) for
+See the [viewer documentation](dataflow_agentmm/visualization/README.md) for
 pipeline columns, Judge fields, and the evidence it deliberately separates.
 
 ## Development install and tests
@@ -284,5 +284,5 @@ python -m pip install -e ".[test]"
 
 A remote MCP adapter can remain small because its tools and integration-specific
 dependencies run in the upstream MCP server. The bundled
-[`create-env` workspace skill](dataflow_mm_agent/skills/create-env/SKILL.md)
+[`create-env` workspace skill](dataflow_agentmm/skills/create-env/SKILL.md)
 documents the adapter workflow and validation requirements.

@@ -1,4 +1,4 @@
-# DataFlow-MM-Agent showcases
+# DataFlow-AgentMM showcases
 
 These are GitHub-native walkthroughs of real multimodal trajectories. Each page
 contains the natural task prompt, a fading GIF of the complete visual trajectory,

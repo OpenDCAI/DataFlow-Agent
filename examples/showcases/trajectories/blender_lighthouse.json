@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-compact-v2",
+  "format": "dataflow-agentmm-showcase-compact-v2",
   "task_id": "blender-lighthouse-001",
   "env_id": "blender_mcp",
   "task_prompt": "我想做一个低多边形的海岛灯塔小景观，有点像摆在桌上的微缩模型。帮我在 Blender 里搭一下，先看场景效果。\n\n灯塔是视觉中心，想要奶白色塔身配红色横条纹、深色灯室和红色尖顶。旁边有一间低矮的蓝灰色小屋，一条石块小路通向灯塔，再散落几块礁石。小岛是沙色的，周围是蓝绿色的海；整体轮廓紧凑，像一件完整的小摆件。\n\n风格干净、简洁一点，不用太写实。希望灯塔、小屋和前景之间有层次，比例舒服，配色别太杂，看起来安静又有一点童话感。",

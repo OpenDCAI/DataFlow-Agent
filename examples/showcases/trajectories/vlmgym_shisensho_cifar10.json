@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-compact-v2",
+  "format": "dataflow-agentmm-showcase-compact-v2",
   "task_id": "task0002",
   "env_id": "vlmgym_shisensho_cifar10",
   "task_prompt": "You are playing a Shisen-sho puzzle game that uses CIFAR-10 images. Each tile on the board corresponds to one of the CIFAR-10 classes: airplane, automobile, bird, cat, deer, dog, frog, horse, ship, and truck. The objective is to find a pair of tiles that belong to the same class and can be connected with a path that does not cross any other tiles and makes at most two turns.\nCall the match tool with (row1, col1) and (row2, col2), where row and col are 0-indexed numbers starting from the top-left of the board.\nBefore each action, briefly describe the relevant tiles and your reasoning.\n\nGoal: clear every tile from the 6x6 board. Call finish only after the tool results confirm the goal.",

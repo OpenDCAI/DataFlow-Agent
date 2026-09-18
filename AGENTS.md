@@ -1,13 +1,13 @@
-# DataFlow-MM-Agent workspace
+# DataFlow-AgentMM workspace
 
 Treat this repository as a human–coding-agent workspace as well as a Python
 distribution. Preserve user changes, keep credentials and local runtime output
 out of source, and validate changes in proportion to their risk.
 
-When asked to create, port, expand, or audit an Agent-MM Env—or to translate an
+When asked to create, port, expand, or audit an DataFlow-AgentMM Env—or to translate an
 MCP server, application, library, external process, or blank product idea into
 an Env—read the complete
-`dataflow_mm_agent/skills/create-env/SKILL.md` before taking implementation
+`dataflow_agentmm/skills/create-env/SKILL.md` before taking implementation
 actions. Follow its routing instructions and read each referenced resource
 required for the current starting mode.
 

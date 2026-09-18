@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-compact-v2",
+  "format": "dataflow-agentmm-showcase-compact-v2",
   "task_id": "task0005",
   "env_id": "pixel_game",
   "task_prompt": "ORBIT VAULT 的 BOT 需要在能源耗尽前完成清扫：收集画面中的全部五枚宝石并抵达 GOAL。电量只够 40 次成功的单格移动；撞墙不耗电，但请避免无效试探。完成后简要报告你的路线。",

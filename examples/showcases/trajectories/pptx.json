@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-compact-v2",
+  "format": "dataflow-agentmm-showcase-compact-v2",
   "task_id": "task0019",
   "env_id": "pptx",
   "task_prompt": "附件依次是 Northstar 董事会经营简报的三页参考图。请将它们复刻为一份 16:9、三页、可编辑的 PowerPoint：忠实保留每页的信息、视觉层级、版式关系、配色和页码，并让整套演示在投影时仍然清晰。不要把参考图整页作为背景或单张图片铺入；标题、数据、卡片、图形和流程内容都应尽可能保持可编辑。完成后检查整套页面的渲染效果，并保存为 northstar_board_update.pptx。",

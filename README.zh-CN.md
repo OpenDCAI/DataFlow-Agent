@@ -1,10 +1,10 @@
-<h1 align="center">DataFlow-MM-Agent</h1>
+<h1 align="center">DataFlow-AgentMM</h1>
 
-<p align="center"><img src="assets/banner.png" alt="DataFlow-MM-Agent：在任意 Env 中运行多模态 Agent，并保留可验证的轨迹" width="100%"></p>
+<p align="center"><img src="assets/banner.png" alt="DataFlow-AgentMM：在任意 Env 中运行多模态 Agent，并保留可验证的轨迹" width="100%"></p>
 
 <p align="center">
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="python"></a>
-  <a href="dataflow_mm_agent/version.py"><img src="https://img.shields.io/badge/version-1.0.7-blue" alt="version"></a>
+  <a href="dataflow_agentmm/version.py"><img src="https://img.shields.io/badge/version-1.0.7-blue" alt="version"></a>
   <a href="https://github.com/OpenDCAI/DataFlow"><img src="https://img.shields.io/badge/built%20on-open--dataflow--mm-6c8cff" alt="built on"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-lightgrey" alt="license"></a>
 </p>
@@ -14,12 +14,11 @@
 
 - **看着 Agent 在画面上操作** —— 一个任务、一个 Env、一次工具循环；每一步动作
   和渲染出的 observation 都被完整记录。
-- **合成轨迹数据** —— 规模化生成，然后验证、评审、修复、筛选，再导出用于评测、
-  SFT 或 RL。
+- **合成轨迹数据** —— 规模化生成，然后验证、评审、修复和筛选，供后续使用。
 - **保留下来的数据是可信的** —— 在全新 Env 中确定性重放，回答“这串动作是否真的
   能得到那个最终状态”。
 
-Python 包：`dataflow_mm_agent`。目前规范化支持的内容类型是文本和图像；相关契约
+Python 包：`dataflow_agentmm`。目前规范化支持的内容类型是文本和图像；相关契约
 在设计上允许未来加入更多模态，而不要求所有 Env 都必须是有状态的。
 
 <p align="center">
@@ -105,7 +104,7 @@ JSON，无需 JavaScript 或嵌入大量 base64 图片的 HTML。产物与运行
 
 ## 框架设计
 
-DataFlow-MM-Agent 通过统一的数据契约连接环境交互、轨迹记录与数据处理，
+DataFlow-AgentMM 通过统一的数据契约连接环境交互、轨迹记录与数据处理，
 让新接入的 Env 能够复用同一套 rollout 和评估组件。
 
 - **轻量接入环境。** Env 通过 `tools()` 暴露工具、通过 `call()` 执行调用，
@@ -113,7 +112,7 @@ DataFlow-MM-Agent 通过统一的数据契约连接环境交互、轨迹记录�
   也可以使用单独的 Python 进程运行。
 - **统一记录多模态轨迹。** `Trajectory` 保存模型消息、动作和观察，文本与图像
   使用明确的内容块表示。同一份记录可以用于可视化、在新 Env 中重放动作，
-  以及导出训练数据。
+  以及转换为 ms-swift 格式。
 - **分别验证结果与评估质量。** ReplayVerify 重放动作并检查任务的确定性条件；
   Judge 根据轨迹中的证据按 rubric 评分，并给出修复建议。两类结果分别保留，
   便于 pipeline 按任务特点选择适用的检查方式。
@@ -139,7 +138,7 @@ DataFlow-MM-Agent 通过统一的数据契约连接环境交互、轨迹记录�
 | Judge | `AgentMMTrajectoryQualityEvaluator` | 依据真实 observation 按 rubric 评分，并指出哪些步骤出了问题 |
 | Refine | `AgentMMTrajectoryRefiner` | 带着 verifier 结论、评审建议和被标记的步骤重新探索 |
 | Select | `AgentMMTrajectorySelector` | 按声明式条件筛选 trajectory，再排序、去重并截断数量 |
-| Export | `dataflow_mm_agent.export` | 把 trajectory 转成 ms-swift 的 `messages` JSONL 用于监督微调 |
+| Export | `dataflow_agentmm.export` | 把 trajectory 转成 ms-swift 的 `messages` JSONL 格式 |
 
 Judge 和 ReplayVerify 回答的是不同问题：前者评估过程，后者重放动作并检查精确
 状态。开放式创作任务的 replay 结果是 `not_applicable`，而不是硬凑一个 verifier。
@@ -186,7 +185,7 @@ MCP server 通过同一套接口接入：把 `list_tools()` 映射成 `ToolSpec`
 `start()` 中连接、通过同一会话发现工具目录、并在 `close()` 中释放；MCP SDK
 仍然留在 Env 包里。
 
-包中附带的 [`create-env` workspace skill](dataflow_mm_agent/skills/create-env/SKILL.md)
+包中附带的 [`create-env` workspace skill](dataflow_agentmm/skills/create-env/SKILL.md)
 完整给出了工具目录发现、生命周期规则、adapter 工作流和验证要求。
 
 <a name="contract"></a>
@@ -213,13 +212,13 @@ Trajectory + TaskResolver + optional VerifierResolver
 ## 仓库结构
 
 ```text
-dataflow-mm-agent/
-├── dataflow_mm_agent/
+dataflow-agentmm/
+├── dataflow_agentmm/
 │   ├── contracts/          # Task、Env、消息、工具和 trajectory
 │   ├── env/                # registry、plugin 和进程隔离 adapter
 │   ├── runtime_components/ # rollout、工具循环、上下文策略和 ReplayVerify
 │   ├── operators/          # Generate、Judge、Refine 和 Select
-│   ├── export/             # ms-swift 训练数据导出
+│   ├── export/             # ms-swift 格式转换
 │   ├── prompts.py          # 内置的中英双语提示词
 │   ├── serving/            # OpenAI-compatible 与 Gemini 多模态 serving
 │   ├── visualization/      # 离线 trajectory HTML 导出器与查看器
@@ -232,7 +231,7 @@ dataflow-mm-agent/
 ```
 
 具体 Env 位于核心发行包之外，因此安装一个集成不会迫使
-`dataflow-mm-agent` 同时安装所有渲染或游戏依赖。如果某个集成需要独立的解释器
+`dataflow-agentmm` 同时安装所有渲染或游戏依赖。如果某个集成需要独立的解释器
 或依赖边界，可以使用本包提供的进程代理。
 
 ## 适用范围
@@ -249,11 +248,11 @@ dataflow-mm-agent/
 
 - [快速开始：安装、配置与运行](QUICKSTART.zh-CN.md)
 - [Showcase 索引](examples/showcases/README.md)
-- [离线轨迹 HTML 报告](dataflow_mm_agent/visualization/README.md)
-- [创建 Env 或 MCP 适配器](dataflow_mm_agent/skills/create-env/SKILL.md)
-- [Env 契约与包结构](dataflow_mm_agent/skills/create-env/references/contracts-and-layout.md)
-- [任务生成](dataflow_mm_agent/skills/create-env/references/task-generation.md)
-- [验证策略](dataflow_mm_agent/skills/create-env/references/validation.md)
+- [离线轨迹 HTML 报告](dataflow_agentmm/visualization/README.md)
+- [创建 Env 或 MCP 适配器](dataflow_agentmm/skills/create-env/SKILL.md)
+- [Env 契约与包结构](dataflow_agentmm/skills/create-env/references/contracts-and-layout.md)
+- [任务生成](dataflow_agentmm/skills/create-env/references/task-generation.md)
+- [验证策略](dataflow_agentmm/skills/create-env/references/validation.md)
 
 ## 许可证
 

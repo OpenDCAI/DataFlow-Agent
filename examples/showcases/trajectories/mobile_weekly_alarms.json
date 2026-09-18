@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-compact-v2",
+  "format": "dataflow-agentmm-showcase-compact-v2",
   "task_id": "mobile-weekly-alarms-001",
   "env_id": "mobile_mcp",
   "task_prompt": "帮我把时钟里的作息闹钟设一下：工作日早上7:20起床，周末改成9:10，分别叫「工作日起床」和「周末慢慢来」，这两个都开启。\n\n再加一个每天晚上22:45的「睡前阅读」，这个先关着，等我想用的时候再打开。铃声和振动保持默认就好。设好以后告诉我最后的安排。",

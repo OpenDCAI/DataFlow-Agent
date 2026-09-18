@@ -1,4 +1,0 @@
-interface:
-  display_name: "Create Agent-MM Env"
-  short_description: "Scan or design a source system and build an Agent-MM Env"
-  default_prompt: "Use $create-env to audit this source or MCP and implement a tested Agent-MM environment pack."

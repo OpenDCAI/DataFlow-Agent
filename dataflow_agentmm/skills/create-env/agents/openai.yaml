@@ -1,0 +1,4 @@
+interface:
+  display_name: "Create DataFlow-AgentMM Env"
+  short_description: "Scan or design a source system and build an DataFlow-AgentMM Env"
+  default_prompt: "Use $create-env to audit this source or MCP and implement a tested DataFlow-AgentMM environment pack."

@@ -16,7 +16,7 @@ from PIL import Image
 
 source = Image.open("pics/overview.png").convert("RGB")          # or DataFlow-AgentMM.png
 scaled = source.resize((1600, round(source.height * 1600 / source.width)), Image.LANCZOS)
-scaled.quantize(colors=256).save("dataflow-mm-agent/assets/pipeline.png", optimize=True)
+scaled.quantize(colors=256).save("dataflow-agentmm/assets/pipeline.png", optimize=True)
 ```
 
 Keep the alt text on both images: it is what readers get when images fail to

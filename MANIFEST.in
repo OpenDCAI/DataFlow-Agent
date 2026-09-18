@@ -2,6 +2,6 @@ include LICENSE
 include README.md
 include AGENTS.md
 graft examples
-graft dataflow_mm_agent/skills
+graft dataflow_agentmm/skills
 global-exclude *.py[cod]
 global-exclude __pycache__/

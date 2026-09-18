@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-refine-pair-v2",
+  "format": "dataflow-agentmm-showcase-refine-pair-v2",
   "task_id": "task0003",
   "env_id": "diagram",
   "task_prompt": "附件是《Lighthouse Incident Response Runbook 3.2》的两页摘录。请把其中分散的信息转成一张值班人员可直接使用的单页、可编辑流程图，而不是照抄文档版式。图中应清楚表达从信号发现到关闭事件的主流程、何时判定为非事件、SEV-1/SEV-2 的通知分支、回滚失败后的隔离与故障转移，以及每次交接必须留下的证据；三类核心角色也要在相应阶段有明确归属。读者应能从连线方向和视觉分组中快速理解正常路径与升级路径，关键步骤、角色和证据必须完整可读，不能用省略号代替。完成后检查图的可读性，并保存 Draw.io 源文件和 PNG 预览。",

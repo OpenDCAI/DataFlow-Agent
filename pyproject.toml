@@ -3,15 +3,15 @@ requires = ["setuptools>=61", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "dataflow-mm-agent"
+name = "dataflow-agentmm"
 version = "1.0.7"
-description = "Multimodal agent runtime contracts and trajectory operators for DataFlow-MM."
+description = "DataFlow-AgentMM: multimodal agent runtime, contracts, and trajectory operators built on DataFlow-MM."
 readme = "README.md"
 requires-python = ">=3.10, <4"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [
-    {name = "DataFlow-MM-Agent contributors"},
+    {name = "DataFlow-AgentMM contributors"},
 ]
 dependencies = [
     "open-dataflow-mm",
@@ -25,15 +25,15 @@ dependencies = [
 test = ["pytest"]
 
 [project.scripts]
-dataflow-mm-trajectory-html = "dataflow_mm_agent.visualization.__main__:main"
-dataflow-mm-export-swift = "dataflow_mm_agent.export.__main__:main"
+dataflow-agentmm-trajectory-html = "dataflow_agentmm.visualization.__main__:main"
+dataflow-agentmm-export-swift = "dataflow_agentmm.export.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["dataflow_mm_agent", "dataflow_mm_agent.*"]
+include = ["dataflow_agentmm", "dataflow_agentmm.*"]
 
 [tool.setuptools.package-data]
-dataflow_mm_agent = [
+dataflow_agentmm = [
     "skills/*/SKILL.md",
     "skills/*/agents/*.yaml",
     "skills/*/references/*.md",

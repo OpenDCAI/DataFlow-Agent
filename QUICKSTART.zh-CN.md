@@ -2,7 +2,7 @@
 
 [English](QUICKSTART.md) | **简体中文** · [← README](README.zh-CN.md)
 
-安装 `dataflow-mm-agent`、配置模型、跑通第一次 rollout，以及使用自带工具所需的全部内容。
+安装 `dataflow-agentmm`、配置模型、跑通第一次 rollout，以及使用自带工具所需的全部内容。
 
 ## 目录
 
@@ -12,7 +12,7 @@
 - [第一次 Rollout](#第一次-rollout)
 - [多模态任务](#多模态任务)
 - [流程各阶段](#流程各阶段)
-- [导出训练数据](#导出训练数据)
+- [导出为 ms-swift 格式](#导出为-ms-swift-格式)
 - [查看轨迹](#查看轨迹)
 - [开发模式安装与测试](#开发模式安装与测试)
 
@@ -33,8 +33,8 @@
 3. 创建并激活推荐的 Conda 环境：
 
 ```bash
-conda create -n dataflow-mm-agent python=3.12 pip -y
-conda activate dataflow-mm-agent
+conda create -n dataflow-agentmm python=3.12 pip -y
+conda activate dataflow-agentmm
 ```
 
 4. 更新打包工具，然后安装解压后的包：
@@ -47,7 +47,7 @@ python -m pip install .
 5. 验证安装结果：
 
 ```bash
-python -c "import dataflow_mm_agent as d; print(d.__version__)"
+python -c "import dataflow_agentmm as d; print(d.__version__)"
 ```
 
 该命令应当输出已安装的包版本。以后升级时，重新下载并解压新版 ZIP，激活同一个
@@ -77,7 +77,7 @@ $env:DF_API_KEY = "your-api-key"
 ```
 
 请通过 shell 或密钥管理服务设置这些变量，不要把实际值提交到仓库。
-也支持 Gemini 后端，配置方式见 [serving factory](dataflow_mm_agent/serving/serving_factory.py)。
+也支持 Gemini 后端，配置方式见 [serving factory](dataflow_agentmm/serving/serving_factory.py)。
 
 ## 第一次 Rollout
 
@@ -85,8 +85,8 @@ $env:DF_API_KEY = "your-api-key"
 Env ID（参见[轻量级 Env 设计](README.zh-CN.md#轻量级-env-设计)）。
 
 ```python
-from dataflow_mm_agent import AgentRollout, Message, RolloutConfig, Task
-from dataflow_mm_agent.serving import create_model_serving_from_env
+from dataflow_agentmm import AgentRollout, Message, RolloutConfig, Task
+from dataflow_agentmm.serving import create_model_serving_from_env
 
 task = Task(
     task_id="draw-001",
@@ -114,7 +114,7 @@ print(trajectory.steps[-1].action)
 ```python
 from pathlib import Path
 
-from dataflow_mm_agent import ImageContent, Message, Task, TextContent
+from dataflow_agentmm import ImageContent, Message, Task, TextContent
 
 reference = ImageContent.from_bytes(
     Path("reference.png").read_bytes(),
@@ -142,7 +142,7 @@ store 会在 rollout 前把它解析为普通 `TextContent`，就像把 `image_r
 
 ## 流程各阶段
 
-DataFlow-MM-Agent 沿用 DataFlow 的可组合算子风格，同时将生成、重放和质量评估
+DataFlow-AgentMM 沿用 DataFlow 的可组合算子风格，同时将生成、重放和质量评估
 作为彼此独立的关注点：
 
 - **Generate** 运行共享的多模态工具循环，并记录尚未评分的 trajectory。设置
@@ -180,8 +180,8 @@ DataFlow-MM-Agent 沿用 DataFlow 的可组合算子风格，同时将生成、�
   字段实现，可直接组合 `operators.selector_features` 中公开的内置函数：
 
   ```python
-  from dataflow_mm_agent.operators import AgentMMTrajectorySelector, register_selector_feature, uses_tool
-  from dataflow_mm_agent.operators import selector_features as sf
+  from dataflow_agentmm.operators import AgentMMTrajectorySelector, register_selector_feature, uses_tool
+  from dataflow_agentmm.operators import selector_features as sf
 
   register_selector_feature("use_api_tool", uses_tool("api", successful=True))
 
@@ -204,7 +204,7 @@ DataFlow-MM-Agent 沿用 DataFlow 的可组合算子风格，同时将生成、�
   省略了多少步。还可以设置 `max_prefix_chars` 字符预算，或通过 `summarizer` 回调
   接入模型总结。裁剪只作用于请求：trajectory 始终记录全部内容，重放、导出和评审
   都不受影响。
-- **提示词语言**。内置提示词提供英文和中文两套（`dataflow_mm_agent/prompts.py`），
+- **提示词语言**。内置提示词提供英文和中文两套（`dataflow_agentmm/prompts.py`），
   默认英文。给 `RolloutConfig`、`AgentMMTrajectoryQualityEvaluator` 或
   `AgentMMTrajectoryRefiner` 传 `language="zh"` 即可切换 system prompt、通用 rubric
   文案和修复模板；显式传入的 `system_prompt=` 优先级更高。任务本身用什么语言，
@@ -213,20 +213,20 @@ DataFlow-MM-Agent 沿用 DataFlow 的可组合算子风格，同时将生成、�
 开放式创作任务不需要虚构一个 verifier。它们的 ReplayVerify 状态为
 `not_applicable`，由 Judge 评估渲染结果及其生成过程。
 
-## 导出训练数据
+## 导出为 ms-swift 格式
 
 Trajectory 可以转换为 [ms-swift](https://github.com/modelscope/ms-swift) 的
-`messages` JSONL 用于监督微调。导出只做格式转换，不按验证或 Judge 结果筛选。
+`messages` JSONL 格式。导出只做格式转换，不按验证或 Judge 结果筛选。
 
 ```bash
-dataflow-mm-export-swift trajectories/*.jsonl -o sft/train.jsonl
-# 或：python -m dataflow_mm_agent.export trajectories/*.jsonl -o sft/train.jsonl
+dataflow-agentmm-export-swift trajectories/*.jsonl -o exports/trajectories.jsonl
+# 或：python -m dataflow_agentmm.export trajectories/*.jsonl -o exports/trajectories.jsonl
 ```
 
 每条 trajectory 导出为一行。system、user、assistant 消息保留原始记录文本
 （assistant 文本即模型原始动作响应）；回应 assistant 的 observation 转为
 `tool_response`；图片转为 `<image>` 标签并按顺序写入 `images`。图片默认按内容
-去重写入 `sft/train_images/` 并使用绝对路径引用，也可用 `--image-mode base64`
+去重写入 `exports/trajectories_images/` 并使用绝对路径引用，也可用 `--image-mode base64`
 内联。输入可以是 trajectory JSON、`TrajectoryStore` JSONL，或带 `trajectory`
 列的 pipeline JSONL。最后一个 assistant 回合之后的消息会被丢弃，没有 assistant
 回合的 trajectory 会被跳过。
@@ -237,12 +237,12 @@ dataflow-mm-export-swift trajectories/*.jsonl -o sft/train.jsonl
 包含每一步的动作、observation 和图片：
 
 ```bash
-dataflow-mm-trajectory-html trajectory.json -o report.html
-# 或：python -m dataflow_mm_agent.visualization trajectory.json -o report.html
+dataflow-agentmm-trajectory-html trajectory.json -o report.html
+# 或：python -m dataflow_agentmm.visualization trajectory.json -o report.html
 ```
 
 字段含义、Judge 相关列以及它刻意区分开的几类证据，见
-[查看器文档](dataflow_mm_agent/visualization/README.md)。
+[查看器文档](dataflow_agentmm/visualization/README.md)。
 
 ## 开发模式安装与测试
 
@@ -254,4 +254,3 @@ python -m pip install -e ".[test]"
 
 远程 MCP adapter 可以保持得很轻，因为工具及其集成专属依赖运行在上游 MCP
 server 中。
-

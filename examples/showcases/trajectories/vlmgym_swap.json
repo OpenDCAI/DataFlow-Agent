@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-compact-v2",
+  "format": "dataflow-agentmm-showcase-compact-v2",
   "task_id": "task0002",
   "env_id": "vlmgym_swap",
   "task_prompt": "You are playing a Match-3 Game where you need to swap adjacent tiles to create matches of 3 or more identical tiles.\n\nRules:\n- Tiles are identified by color (Red, Green, Blue, Yellow) and shape (circle, square, triangle)\n- You can only swap adjacent tiles (not diagonal)\n- A valid move must create at least one match of 3 or more identical tiles\n- After matches are removed, tiles above will fall down and new tiles will appear at the top\n- If no valid moves are available, the board will automatically be shuffled\n\nCall the swap tool with (row1, col1) and (row2, col2), where row and col are 0-indexed numbers starting from the top-left of the board.\nBefore each action, briefly describe the relevant tiles and your reasoning.\n\nGoal: reach a score of 150 or higher. Call finish only after the tool results confirm the goal.",

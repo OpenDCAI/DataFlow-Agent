@@ -1,5 +1,5 @@
 {
-  "format": "dataflow-mm-agent-showcase-compact-v2",
+  "format": "dataflow-agentmm-showcase-compact-v2",
   "task_id": "task0004",
   "env_id": "geometry_proof",
   "task_prompt": "在锐角三角形 ABC 中，AD⊥BC，垂足为 D。从 D 分别向边 AB、AC 作垂线，垂足分别为 E、F。证明：直线 EF 平行于三角形 ABC 外接圆在点 A 处的切线。题目不附图；请自行构图并检查图形，必要时添加辅助线，然后给出完整证明。绘图方式与证明路线由你决定。",
