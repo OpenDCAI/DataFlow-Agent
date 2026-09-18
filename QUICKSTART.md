@@ -1,11 +1,16 @@
-# Quickstart
+<a name="quickstart"></a>
+
+# 🔁 From installation to your first trajectory
 
 **English** | [简体中文](QUICKSTART.zh-CN.md) · [← README](README.md)
 
-Everything needed to install `dataflow-agentmm`, point it at a model, run a
-first rollout, and use the bundled tools.
+From installation and model configuration to a first rollout, trajectory
+inspection, and ms-swift export. Run one task end to end, then compose the
+pipeline stages you need.
 
-## Contents
+<a name="contents"></a>
+
+## 📑 Contents
 
 - [Install](#install)
 - [Configure a model backend](#configure-a-model-backend)
@@ -17,7 +22,9 @@ first rollout, and use the bundled tools.
 - [Read a trajectory](#read-a-trajectory)
 - [Development install and tests](#development-install-and-tests)
 
-## Install
+<a name="install"></a>
+
+## 📦 Install
 
 Requirements:
 
@@ -26,6 +33,10 @@ Requirements:
 
 Concrete visual Envs may have additional browser, rendering, game, or office
 dependencies; those belong to the Env integration rather than this core package.
+
+If you already have a Python 3.10+ environment and Git, the two installation
+commands in the [README Quickstart](README.md#quickstart) are sufficient.
+The steps below use Conda and a source ZIP; Git is not required.
 
 1. On the repository's `mm-agent` branch page, choose **Code → Download ZIP**.
 2. Extract the archive and open a terminal in the extracted directory—the one
@@ -54,7 +65,9 @@ The command should print the installed package version. To upgrade later,
 download the new ZIP, extract it, activate the same Conda environment, and run
 `python -m pip install --upgrade .` from the new directory.
 
-## Configure a model backend
+<a name="configure-a-model-backend"></a>
+
+## ⚙️ Configure a model backend
 
 Installation itself does not require an API key; configure your model endpoint
 before a live rollout. `create_model_serving_from_env()` reads configuration
@@ -83,7 +96,9 @@ values. Gemini is also supported; see the
 [serving factory](dataflow_agentmm/serving/serving_factory.py) for its
 configuration.
 
-## First rollout
+<a name="first-rollout"></a>
+
+## ▶️ First rollout
 
 This example assumes an external Env pack has registered `my_visual_env`;
 replace that placeholder with your registered Env ID (see
@@ -115,7 +130,9 @@ input, not a mandatory wrapper around every task. `judge_ref` is an optional
 public score range plus task-specific criteria; when omitted, Judge uses its
 generic rubric.
 
-## Multimodal tasks
+<a name="multimodal-tasks"></a>
+
+## 🖼️ Multimodal tasks
 
 ```python
 from pathlib import Path
@@ -146,7 +163,9 @@ with confined, SHA-256-pinned `text_ref` blocks (`text/plain` or
 `TextContent` before rollout, just as `image_ref` resolves to inline
 `ImageContent`; unresolved paths never reach the model.
 
-## Pipeline stages
+<a name="pipeline-stages"></a>
+
+## 🔄 Pipeline stages
 
 The operators follow DataFlow's composable-operator style while keeping
 generation, replay, and quality evaluation as separate concerns.
@@ -217,7 +236,9 @@ Open-ended authoring tasks do not need a pretend verifier. Their ReplayVerify
 status is `not_applicable`, while Judge evaluates the rendered result and the
 process that produced it.
 
-## Runtime settings
+<a name="runtime-settings"></a>
+
+## 🎛️ Runtime settings
 
 **Request context.** `RolloutConfig(context_policy=ContextPolicy(...))` decides
 how much recorded history each live request carries. It is off by default (every
@@ -241,7 +262,9 @@ config = RolloutConfig(max_steps=64, context_policy=ContextPolicy(keep_last_step
 system prompt, the generic rubric text, and the repair templates; an explicit
 `system_prompt=` always wins. Task language still comes from the Task messages.
 
-## Export to ms-swift
+<a name="export-to-ms-swift"></a>
+
+## 📤 Export to ms-swift
 
 Trajectories convert to [ms-swift](https://github.com/modelscope/ms-swift)
 `messages` JSONL format. The export is a format conversion
@@ -261,7 +284,9 @@ become `<image>` tags listed in order under `images`. Images are written once to
 or pipeline JSONL with a `trajectory` column. Messages after the last assistant
 turn are dropped, and a trajectory with no assistant turn is skipped.
 
-## Read a trajectory
+<a name="read-a-trajectory"></a>
+
+## 🔎 Read a trajectory
 
 Export any trajectory, pipeline JSONL, or rollout directory as one offline HTML
 page with every action, observation, and image:
@@ -274,7 +299,9 @@ dataflow-agentmm-trajectory-html trajectory.json -o report.html
 See the [viewer documentation](dataflow_agentmm/visualization/README.md) for
 pipeline columns, Judge fields, and the evidence it deliberately separates.
 
-## Development install and tests
+<a name="development-install-and-tests"></a>
+
+## 🧪 Development install and tests
 
 If you plan to edit the source, install it in editable mode with the test extra:
 

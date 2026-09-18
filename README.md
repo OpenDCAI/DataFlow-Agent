@@ -32,7 +32,9 @@ Env stateful.
 
 <a name="showcases"></a>
 
-## What can this package do?
+<a name="what-can-this-package-do"></a>
+
+## 🎨 What can this package do?
 
 <div align="center">
 <table align="center">
@@ -97,17 +99,26 @@ ordinary image assets under every corresponding tool step, and compact JSON.
 They do not require JavaScript or embed images as base64 inside a large HTML file. See the
 [showcase index](examples/showcases/README.md) for artifacts and run metadata.
 
-## Quickstart
+<a name="quickstart"></a>
 
-Download the `mm-agent` branch and install the extracted package with
-`python -m pip install .`. Configure an OpenAI-compatible model endpoint,
-register an Env, and run your first task.
-See the [detailed Quickstart](QUICKSTART.md) for environment setup, model
-configuration, rollout examples, and pipeline usage.
+## 🚀 Quickstart
+
+With Python 3.10+ and Git available, run these commands in your Python environment:
+
+```bash
+python -m pip install "git+https://github.com/OpenDCAI/DataFlow-Agent.git@mm-agent"
+python -c "import dataflow_agentmm as d; print(d.__version__)"
+```
+
+Next, configure an OpenAI-compatible model endpoint and register an Env.
+Continue with [From installation to your first trajectory](QUICKSTART.md)
+for environment setup, your first rollout, trajectory inspection, and export.
 
 <a name="framework"></a>
 
-## Framework design
+<a name="framework-design"></a>
+
+## 🧩 Framework design
 
 DataFlow-AgentMM connects environment interaction, trajectory recording, and
 data processing through shared contracts. This lets new Envs reuse the same
@@ -132,7 +143,9 @@ rollout and evaluation components.
 
 <a name="pipeline"></a>
 
-## Trajectory pipeline
+<a name="trajectory-pipeline"></a>
+
+## 🔄 Trajectory pipeline
 
 A `Task` names an Env and carries the messages the model sees. `AgentRollout`
 creates a fresh Env, runs one tool loop, and records every action and
@@ -154,7 +167,9 @@ Judge and ReplayVerify answer different questions: one reviews the process, the
 other reproduces the actions and checks exact state. Open-ended authoring tasks
 report `not_applicable` for replay rather than pretending to have a verifier.
 
-## Lightweight Env design
+<a name="lightweight-env-design"></a>
+
+## 🪶 Lightweight Env design
 
 An Env is a tool catalog plus a dispatcher. That is the complete mandatory
 surface:
@@ -203,7 +218,9 @@ validation gates in full.
 
 <a name="contract"></a>
 
-## Core contracts
+<a name="core-contracts"></a>
+
+## 📐 Core contracts
 
 ```text
 Task ──> AgentRollout ──> Trajectory
@@ -224,7 +241,9 @@ Trajectory + TaskResolver + optional VerifierResolver
 - `Trajectory` contains actions and observations, not a verifier score or
   private Scenario data.
 
-## Repository layout
+<a name="repository-layout"></a>
+
+## 📁 Repository layout
 
 ```text
 dataflow-agentmm/
@@ -250,7 +269,9 @@ does not force every rendering or game dependency into `dataflow-agentmm`.
 An integration may use the package's process proxy when it needs a dedicated
 interpreter or dependency boundary.
 
-## Scope
+<a name="scope"></a>
+
+## 🎯 Scope
 
 - Text and image are the canonical content types today; audio and video are not
   part of the contracts yet.
@@ -262,9 +283,11 @@ interpreter or dependency boundary.
 - Process isolation is optional: use it when an Env needs its own interpreter or
   dependency boundary.
 
-## Further reading
+<a name="further-reading"></a>
 
-- [Quickstart: install, configure, and run](QUICKSTART.md)
+## 📚 Further reading
+
+- [From installation to your first trajectory](QUICKSTART.md)
 - [Showcase index](examples/showcases/README.md)
 - [Offline trajectory HTML reports](dataflow_agentmm/visualization/README.md)
 - [Create an Env or MCP adapter](dataflow_agentmm/skills/create-env/SKILL.md)
@@ -272,11 +295,15 @@ interpreter or dependency boundary.
 - [Task generation](dataflow_agentmm/skills/create-env/references/task-generation.md)
 - [Validation strategy](dataflow_agentmm/skills/create-env/references/validation.md)
 
-## License
+<a name="license"></a>
+
+## 📄 License
 
 Apache-2.0. See [LICENSE](LICENSE).
 
-## Acknowledgements
+<a name="acknowledgements"></a>
+
+## 🙏 Acknowledgements
 
 - [DataFlow-MM](https://github.com/OpenDCAI/DataFlow) for the operator, storage,
   and registry conventions this package builds on.

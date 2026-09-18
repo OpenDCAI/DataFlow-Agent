@@ -30,7 +30,9 @@ Python 包：`dataflow_agentmm`。目前规范化支持的内容类型是文本�
 
 <a name="showcases"></a>
 
-## 这个包可以做什么？
+<a name="这个包可以做什么"></a>
+
+## 🎨 这个包可以做什么？
 
 <div align="center">
 <table align="center">
@@ -94,15 +96,25 @@ Python 包：`dataflow_agentmm`。目前规范化支持的内容类型是文本�
 JSON，无需 JavaScript 或嵌入大量 base64 图片的 HTML。产物与运行记录见
 [Showcase 索引](examples/showcases/README.md)。
 
-## 快速开始
+<a name="快速开始"></a>
 
-下载 `mm-agent` 分支，在解压后的目录运行 `python -m pip install .`，
-配置 OpenAI-compatible 模型接口并注册 Env，即可开始运行任务。
-环境准备、模型配置、首条 rollout 和 pipeline 用法见[详细 Quickstart 指南](QUICKSTART.zh-CN.md)。
+## 🚀 快速开始
+
+准备好 Python 3.10+ 和 Git，在你的 Python 环境中运行：
+
+```bash
+python -m pip install "git+https://github.com/OpenDCAI/DataFlow-Agent.git@mm-agent"
+python -c "import dataflow_agentmm as d; print(d.__version__)"
+```
+
+接着配置 OpenAI-compatible 模型接口并注册 Env，即可开始运行任务。
+环境准备、首条 rollout、轨迹查看与导出，见[从安装到第一条轨迹](QUICKSTART.zh-CN.md)。
 
 <a name="framework"></a>
 
-## 框架设计
+<a name="框架设计"></a>
+
+## 🧩 框架设计
 
 DataFlow-AgentMM 通过统一的数据契约连接环境交互、轨迹记录与数据处理，
 让新接入的 Env 能够复用同一套 rollout 和评估组件。
@@ -122,7 +134,9 @@ DataFlow-AgentMM 通过统一的数据契约连接环境交互、轨迹记录与
 
 <a name="pipeline"></a>
 
-## 轨迹生成与处理流程
+<a name="轨迹生成与处理流程"></a>
+
+## 🔄 轨迹生成与处理流程
 
 一个 `Task` 指定 Env 并携带模型看到的消息。`AgentRollout` 创建全新的 Env、
 运行一次工具循环，把每一步动作和 observation 记录成 `Trajectory`。各算子围绕
@@ -143,7 +157,9 @@ DataFlow-AgentMM 通过统一的数据契约连接环境交互、轨迹记录与
 Judge 和 ReplayVerify 回答的是不同问题：前者评估过程，后者重放动作并检查精确
 状态。开放式创作任务的 replay 结果是 `not_applicable`，而不是硬凑一个 verifier。
 
-## 轻量级 Env 设计
+<a name="轻量级-env-设计"></a>
+
+## 🪶 轻量级 Env 设计
 
 一个 Env 就是工具目录加调用分发器，下面是全部的强制接口：
 
@@ -190,7 +206,9 @@ MCP server 通过同一套接口接入：把 `list_tools()` 映射成 `ToolSpec`
 
 <a name="contract"></a>
 
-## 核心契约
+<a name="核心契约"></a>
+
+## 📐 核心契约
 
 ```text
 Task ──> AgentRollout ──> Trajectory
@@ -209,7 +227,9 @@ Trajectory + TaskResolver + optional VerifierResolver
 - Verification 独立解析，不会强制要求 Scenario。
 - `Trajectory` 保存动作和观察，不保存 verifier 分数或私有 Scenario 数据。
 
-## 仓库结构
+<a name="仓库结构"></a>
+
+## 📁 仓库结构
 
 ```text
 dataflow-agentmm/
@@ -234,7 +254,9 @@ dataflow-agentmm/
 `dataflow-agentmm` 同时安装所有渲染或游戏依赖。如果某个集成需要独立的解释器
 或依赖边界，可以使用本包提供的进程代理。
 
-## 适用范围
+<a name="适用范围"></a>
+
+## 🎯 适用范围
 
 - 目前规范化的内容类型是文本和图像，音频和视频尚未进入契约。
 - 本包提供运行时、算子和契约；具体的 Env、它们的依赖和任务由独立的 Env 包提供。
@@ -244,9 +266,11 @@ dataflow-agentmm/
 
 <a name="further-reading"></a>
 
-## 进一步阅读
+<a name="进一步阅读"></a>
 
-- [快速开始：安装、配置与运行](QUICKSTART.zh-CN.md)
+## 📚 进一步阅读
+
+- [从安装到第一条轨迹](QUICKSTART.zh-CN.md)
 - [Showcase 索引](examples/showcases/README.md)
 - [离线轨迹 HTML 报告](dataflow_agentmm/visualization/README.md)
 - [创建 Env 或 MCP 适配器](dataflow_agentmm/skills/create-env/SKILL.md)
@@ -254,11 +278,15 @@ dataflow-agentmm/
 - [任务生成](dataflow_agentmm/skills/create-env/references/task-generation.md)
 - [验证策略](dataflow_agentmm/skills/create-env/references/validation.md)
 
-## 许可证
+<a name="许可证"></a>
+
+## 📄 许可证
 
 Apache-2.0，详见 [LICENSE](LICENSE)。
 
-## 致谢
+<a name="致谢"></a>
+
+## 🙏 致谢
 
 - [DataFlow-MM](https://github.com/OpenDCAI/DataFlow)：本包沿用了它的算子、
   存储和 registry 约定。

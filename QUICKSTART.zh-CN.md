@@ -1,10 +1,15 @@
-# 快速开始
+<a name="快速开始"></a>
+
+# 🔁 从安装到第一条轨迹
 
 [English](QUICKSTART.md) | **简体中文** · [← README](README.zh-CN.md)
 
-安装 `dataflow-agentmm`、配置模型、跑通第一次 rollout，以及使用自带工具所需的全部内容。
+从安装和模型配置开始，跑通首条 rollout，再查看轨迹、导出为 ms-swift 格式。
+先完整运行一个任务，再按需组合 pipeline 各阶段。
 
-## 目录
+<a name="目录"></a>
+
+## 📑 目录
 
 - [环境要求](#环境要求)
 - [安装](#安装)
@@ -17,7 +22,9 @@
 - [开发模式安装与测试](#开发模式安装与测试)
 
 
-## 环境要求
+<a name="环境要求"></a>
+
+## 🛠️ 环境要求
 
 - Conda，可以使用 Miniconda 或 Anaconda
 - 安装时可以访问网络，以便解析并下载 Python 依赖
@@ -25,7 +32,12 @@
 具体视觉 Env 可能还需要浏览器、渲染、游戏或 Office 相关依赖；这些依赖属于
 对应的 Env 集成，不属于本核心包。
 
-## 安装
+<a name="安装"></a>
+
+## 📦 安装
+
+如果已经有 Python 3.10+ 环境和 Git，直接使用 [README 快速开始](README.zh-CN.md#快速开始)
+中的两行安装命令即可。下面给出 Conda + 源码 ZIP 的完整步骤，不需要 Git。
 
 1. 在 GitHub 仓库的 `mm-agent` 分支页面选择 **Code → Download ZIP**。
 2. 解压下载的文件，并在解压后的目录中打开终端；该目录应当包含
@@ -53,7 +65,9 @@ python -c "import dataflow_agentmm as d; print(d.__version__)"
 该命令应当输出已安装的包版本。以后升级时，重新下载并解压新版 ZIP，激活同一个
 Conda 环境，然后在新目录中运行 `python -m pip install --upgrade .` 即可。
 
-## 配置模型后端
+<a name="配置模型后端"></a>
+
+## ⚙️ 配置模型后端
 
 安装本身不需要 API key；运行 rollout 前，请配置模型接口。
 `create_model_serving_from_env()` 会从当前进程的环境变量中读取配置。
@@ -79,7 +93,9 @@ $env:DF_API_KEY = "your-api-key"
 请通过 shell 或密钥管理服务设置这些变量，不要把实际值提交到仓库。
 也支持 Gemini 后端，配置方式见 [serving factory](dataflow_agentmm/serving/serving_factory.py)。
 
-## 第一次 Rollout
+<a name="第一次-rollout"></a>
+
+## ▶️ 第一次 Rollout
 
 下面假设外部 Env 包已经注册了 `my_visual_env`；请将这个占位 ID 替换成已注册的
 Env ID（参见[轻量级 Env 设计](README.zh-CN.md#轻量级-env-设计)）。
@@ -109,7 +125,9 @@ print(trajectory.steps[-1].action)
 必须套用的包装层。`judge_ref` 是可选的公开评分范围与任务专用评判标准；省略
 时 Judge 使用内置通用 rubric。
 
-## 多模态任务
+<a name="多模态任务"></a>
+
+## 🖼️ 多模态任务
 
 ```python
 from pathlib import Path
@@ -140,7 +158,9 @@ store 会在 rollout 前把它解析为普通 `TextContent`，就像把 `image_r
 内联 `ImageContent`；路径缺失、越界或哈希不符会直接拒绝任务，不会交给模型自行
 联网补资源。
 
-## 流程各阶段
+<a name="流程各阶段"></a>
+
+## 🔄 流程各阶段
 
 DataFlow-AgentMM 沿用 DataFlow 的可组合算子风格，同时将生成、重放和质量评估
 作为彼此独立的关注点：
@@ -213,7 +233,9 @@ DataFlow-AgentMM 沿用 DataFlow 的可组合算子风格，同时将生成、�
 开放式创作任务不需要虚构一个 verifier。它们的 ReplayVerify 状态为
 `not_applicable`，由 Judge 评估渲染结果及其生成过程。
 
-## 导出为 ms-swift 格式
+<a name="导出为-ms-swift-格式"></a>
+
+## 📤 导出为 ms-swift 格式
 
 Trajectory 可以转换为 [ms-swift](https://github.com/modelscope/ms-swift) 的
 `messages` JSONL 格式。导出只做格式转换，不按验证或 Judge 结果筛选。
@@ -231,7 +253,9 @@ dataflow-agentmm-export-swift trajectories/*.jsonl -o exports/trajectories.jsonl
 列的 pipeline JSONL。最后一个 assistant 回合之后的消息会被丢弃，没有 assistant
 回合的 trajectory 会被跳过。
 
-## 查看轨迹
+<a name="查看轨迹"></a>
+
+## 🔎 查看轨迹
 
 把任意 trajectory、pipeline JSONL 或 rollout 目录导出成一个离线 HTML 页面，
 包含每一步的动作、observation 和图片：
@@ -244,7 +268,9 @@ dataflow-agentmm-trajectory-html trajectory.json -o report.html
 字段含义、Judge 相关列以及它刻意区分开的几类证据，见
 [查看器文档](dataflow_agentmm/visualization/README.md)。
 
-## 开发模式安装与测试
+<a name="开发模式安装与测试"></a>
+
+## 🧪 开发模式安装与测试
 
 如果需要直接修改源码，可以使用 test extra 进行可编辑安装：
 
