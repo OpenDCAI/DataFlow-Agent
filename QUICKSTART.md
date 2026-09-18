@@ -34,9 +34,12 @@ Requirements:
 Concrete visual Envs may have additional browser, rendering, game, or office
 dependencies; those belong to the Env integration rather than this core package.
 
-If you already have a Python 3.10+ environment and Git, the two installation
+If you already have a Python 3.10+ environment and Git, the installation
 commands in the [README Quickstart](README.md#quickstart) are sufficient.
-The steps below use Conda and a source ZIP; Git is not required.
+The steps below use Conda and source ZIPs; Git is not required.
+The DataFlow-MM source is supplied explicitly so pip can resolve
+`open-dataflow-mm` without a pre-installed copy. Its revision is pinned for
+reproducibility; pip installs the Python dependencies declared by both packages.
 
 1. On the repository's `mm-agent` branch page, choose **Code → Download ZIP**.
 2. Extract the archive and open a terminal in the extracted directory—the one
@@ -48,17 +51,19 @@ conda create -n dataflow-agentmm python=3.12 pip -y
 conda activate dataflow-agentmm
 ```
 
-4. Upgrade the packaging tools and install the extracted package:
+4. Upgrade pip, then install DataFlow-MM and the extracted package together:
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install .
+python -m pip install \
+  "https://github.com/OpenDCAI/DataFlow-MM/archive/155253460f6f2e50705a3e779f259b382a382822.zip" .
 ```
 
-5. Verify the installation:
+5. Check dependency consistency and import both the runtime and the operators:
 
 ```bash
-python -c "import dataflow_agentmm as d; print(d.__version__)"
+python -m pip check
+python -c "import dataflow_agentmm as d; import dataflow_agentmm.operators; print(d.__version__)"
 ```
 
 The command should print the installed package version. To upgrade later,

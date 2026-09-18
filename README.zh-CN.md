@@ -100,11 +100,14 @@ JSON，无需 JavaScript 或嵌入大量 base64 图片的 HTML。产物与运行
 
 ## 🚀 快速开始
 
-准备好 Python 3.10+ 和 Git，在你的 Python 环境中运行：
+准备好 Python 3.10+ 和 Git，在你的 Python 环境中安装主包及其 Python 依赖：
 
 ```bash
-python -m pip install "git+https://github.com/OpenDCAI/DataFlow-Agent.git@mm-agent"
-python -c "import dataflow_agentmm as d; print(d.__version__)"
+python -m pip install --upgrade pip
+python -m pip install \
+  "git+https://github.com/OpenDCAI/DataFlow-MM.git@155253460f6f2e50705a3e779f259b382a382822" \
+  "git+https://github.com/OpenDCAI/DataFlow-Agent.git@mm-agent"
+python -m pip check
 ```
 
 接着配置 OpenAI-compatible 模型接口并注册 Env，即可开始运行任务。

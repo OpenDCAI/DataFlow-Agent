@@ -37,7 +37,10 @@
 ## 📦 安装
 
 如果已经有 Python 3.10+ 环境和 Git，直接使用 [README 快速开始](README.zh-CN.md#快速开始)
-中的两行安装命令即可。下面给出 Conda + 源码 ZIP 的完整步骤，不需要 Git。
+中的安装命令即可。下面给出 Conda + 源码 ZIP 的完整步骤，不需要 Git。
+安装时显式提供 DataFlow-MM 源码地址，让 pip 能解析 `open-dataflow-mm`，
+不依赖本机已经预装。该依赖固定到指定提交以便复现，两个包声明的 Python 依赖
+均由 pip 一并安装。
 
 1. 在 GitHub 仓库的 `mm-agent` 分支页面选择 **Code → Download ZIP**。
 2. 解压下载的文件，并在解压后的目录中打开终端；该目录应当包含
@@ -49,17 +52,19 @@ conda create -n dataflow-agentmm python=3.12 pip -y
 conda activate dataflow-agentmm
 ```
 
-4. 更新打包工具，然后安装解压后的包：
+4. 更新 pip，然后一起安装 DataFlow-MM 与解压后的包：
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install .
+python -m pip install \
+  "https://github.com/OpenDCAI/DataFlow-MM/archive/155253460f6f2e50705a3e779f259b382a382822.zip" .
 ```
 
-5. 验证安装结果：
+5. 检查依赖一致性，并验证运行时与算子都能导入：
 
 ```bash
-python -c "import dataflow_agentmm as d; print(d.__version__)"
+python -m pip check
+python -c "import dataflow_agentmm as d; import dataflow_agentmm.operators; print(d.__version__)"
 ```
 
 该命令应当输出已安装的包版本。以后升级时，重新下载并解压新版 ZIP，激活同一个

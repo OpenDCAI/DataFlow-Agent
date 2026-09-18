@@ -103,11 +103,14 @@ They do not require JavaScript or embed images as base64 inside a large HTML fil
 
 ## 🚀 Quickstart
 
-With Python 3.10+ and Git available, run these commands in your Python environment:
+With Python 3.10+ and Git available, install the package and its Python dependencies:
 
 ```bash
-python -m pip install "git+https://github.com/OpenDCAI/DataFlow-Agent.git@mm-agent"
-python -c "import dataflow_agentmm as d; print(d.__version__)"
+python -m pip install --upgrade pip
+python -m pip install \
+  "git+https://github.com/OpenDCAI/DataFlow-MM.git@155253460f6f2e50705a3e779f259b382a382822" \
+  "git+https://github.com/OpenDCAI/DataFlow-Agent.git@mm-agent"
+python -m pip check
 ```
 
 Next, configure an OpenAI-compatible model endpoint and register an Env.
